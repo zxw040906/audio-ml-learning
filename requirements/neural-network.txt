@@ -1,0 +1,8 @@
+# Python 版本：3.9.25
+# 由 requirements/sync_requirements.py 自动生成
+numpy==1.24.4
+pillow==11.1.0
+protobuf==4.25.9
+tensorboard==2.13.0
+torch==2.0.1
+torchvision==0.15.2

@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "同步依赖并运行当前 Python 文件",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/requirements/sync_requirements.py",
+            "args": [
+                "${file}"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}

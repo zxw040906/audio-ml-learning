@@ -1,0 +1,36 @@
+# Python cache and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# Local-only large datasets, checkpoints, and generated output
+.local-data/
+.local-models/
+.local-output/
+learning/audio-deep-learning/data/urbansound8k/audio/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+
+# TensorBoard and experiment output
+runs/
+logs/
+log_*/
+events.out.tfevents.*
+
+# Credentials and machine-specific files
+.env
+.env.*
+!.env.example
+.aws/
+*.pem
+*.key
+*:Zone.Identifier
+.vscode/*
+!.vscode/
+!.vscode/launch.json

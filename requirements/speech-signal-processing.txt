@@ -1,0 +1,5 @@
+# Python 版本：3.11.16
+# 由 requirements/sync_requirements.py 自动生成
+librosa==0.11.0
+matplotlib==3.11.2
+numpy==2.4.6

@@ -1,0 +1,12 @@
+# Python 版本：3.9.25
+# 由 requirements/sync_requirements.py 自动生成
+librosa==0.11.0
+matplotlib==3.9.2
+numpy==1.24.4
+pandas==2.3.3
+pillow==11.1.0
+protobuf==4.25.9
+tensorboard==2.13.0
+torch==2.0.1
+torchaudio==2.0.2
+torchvision==0.15.2
