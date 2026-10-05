@@ -22,7 +22,7 @@ tar -xzf .local-data/urbansound8k/UrbanSound8K.tar.gz -C .local-data/urbansound8
 
 ## YESNO（小型数据集）
 
-当前工程已有的 60 个 YESNO WAV 已放入 `learning/audio-deep-learning/data/yesno/waves_yesno/`，按你的要求纳入私有学习仓库。这里不包含原始 tar.gz，避免重复保存。
+当前工程已有的 60 个 YESNO WAV 已放入 `learning/audio-deep-learning/data/yesno/waves_yesno/`，纳入私有学习仓库。这里不包含原始 tar.gz，避免重复保存。
 
 ## 信号处理示例音频
 
