@@ -76,12 +76,7 @@ python learning/audio-deep-learning/dataloader.py
 
 本项目清单为 `requirements/audio-deep-learning.txt`。新环境首次使用时运行 `python -m pip install -r requirements/audio-deep-learning.txt`。PyTorch 提供 Tensor/模型/Dataset；TorchAudio 提供音频读取、重采样及 Mel 变换；TorchVision/Pillow 用于图像变换；TensorBoard 用于实验记录；librosa、NumPy、Matplotlib 用于谱图处理和绘制；pandas 用于读取 UrbanSound8K CSV。具体清单取决于生成时激活的环境。PyTorch、TorchAudio、TorchVision 要配套安装；GPU 版本按本机 CUDA/驱动选择。
 
-上面命令从仓库根目录运行，会直接使用当前激活的 Python。直接运行不会同步依赖清单；脚本启动时会先把仓库根目录加入模块搜索路径，让 `from learning.common.paths import ...` 可用，也会加入脚本目录以便导入同目录的 `plot_set.py`。所以在仓库根目录可用相对路径运行，也能从任意工作目录使用绝对路径运行，例如：
-
-```bash
-/home/zxw/anaconda3/envs/pytorch/bin/python \
-  /home/zxw/python_code/project/audio-ml-learning/learning/audio-deep-learning/dataloader.py
-```
+上面命令从仓库根目录运行，会直接使用当前激活的 Python。直接运行不会同步依赖清单；脚本启动时会先把仓库根目录加入模块搜索路径，让 `from learning.common.paths import ...` 可用，也会加入脚本目录以便导入同目录的 `plot_set.py`。若终端在其他目录，先 `cd` 到克隆下来的仓库目录，再执行上面的相对路径命令。
 
 如果希望运行前同步依赖清单，则从仓库根目录使用统一入口：
 

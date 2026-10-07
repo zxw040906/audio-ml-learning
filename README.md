@@ -25,7 +25,7 @@
 
 ## 环境与依赖
 
-**当前开发与运行环境：Windows 上的 WSL2（Linux）**。仓库和 Conda 环境位于 WSL2 文件系统中；下文的 `python`、`conda`、`tensorboard` 命令都在 WSL2 终端执行，示例绝对路径 `/home/zxw/...` 也是 WSL2 内的路径。在 VS Code 中运行时，选择 WSL2 内对应的 Python 解释器；Windows 原生 Python 环境与这里的依赖和路径不共用。
+**当前开发与运行环境：Windows 上的 WSL2（Linux）**。仓库和 Conda 环境位于 WSL2 文件系统中；下文的 `python`、`conda`、`tensorboard` 命令都在 WSL2 终端执行。命令示例默认先进入仓库根目录，因此路径可直接复制；在 VS Code 中运行时，选择 WSL2 内对应的 Python 解释器。Windows 原生 Python 环境与这里的依赖和路径不共用。
 
 仓库沿用 WSL2 中已有的 Conda/Python 环境，不提交环境目录。现有依赖清单覆盖神经网络、信号处理和音频深度学习三个目录；新增的网络训练目录尚无独立清单，首次通过统一入口运行其脚本时会生成 `requirements/network_training.txt`。清单由 `requirements/sync_requirements.py` 扫描项目导入并记录当前环境中的版本；它不是跨机器锁定文件，换 Python 版本或环境后应重新生成并检查。
 
@@ -50,12 +50,7 @@ python -m pip install -r requirements/neural-network.txt
 python learning/audio-deep-learning/dataloader.py
 ```
 
-也可以像下面这样从任意目录使用 Python 和脚本的绝对路径：
-
-```bash
-/home/zxw/anaconda3/envs/pytorch/bin/python \
-  /home/zxw/python_code/project/audio-ml-learning/learning/audio-deep-learning/dataloader.py
-```
+如果当前终端不在仓库根目录，先 `cd` 到克隆下来的仓库目录，再执行上面的相对路径命令；`python` 会使用当前激活的环境。
 
 **统一入口运行**会先同步该子项目的依赖清单，再执行脚本：
 
