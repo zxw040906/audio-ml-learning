@@ -16,12 +16,20 @@
 
 ## 复习路线
 
-1. [语音信号处理](learning/speech-signal-processing/README.md)：从波形、采样率和分帧认识时域与频域特征。
-2. [神经网络基础](learning/neural-network/README.md)：认识神经元、激活函数、卷积、池化和张量形状；[CNN 参数模板](learning/neural-network/README.md#最简-cnn-模板)可按图填写。
-3. [网络训练](learning/network_training/README.md)：从手动求导过渡到 Autograd，理解损失、学习率与梯度清零。
-4. [音频深度学习](learning/audio-deep-learning/README.md)：把音频读取、预处理、Mel 特征和 TensorBoard 串成数据管线。
+1. [语音信号处理](learning/speech-signal-processing/README.md)：从波形、采样率和分帧出发，练习幅值包络、RMS、ZCR、STFT 和谱质心；对照手写实现与 librosa 的边界处理。`SC_BW.py` 尚未计算谱带宽。
+2. [神经网络基础](learning/neural-network/README.md)：从感知机、NumPy 多层前向传播，走到激活函数、卷积、池化和图片张量；用 [CNN 参数模板](learning/neural-network/README.md#最简-cnn-模板)按结构图填写参数并检查输出形状。当前主要验证前向计算，尚未训练 CNN。
+3. [网络训练](learning/network_training/README.md)：用多项式拟合 `sin(x)`，从手动求导过渡到 Autograd 和 `nn.Linear`，理解平方误差、梯度清零、参数更新，以及学习率过大造成的数值发散。
+4. [音频深度学习](learning/audio-deep-learning/README.md)：练习 Tensor、YESNO Dataset/DataLoader、重采样和定长、UrbanSound8K Mel 谱图及 TensorBoard。分类基线尚未完成，需要先确定官方 fold 划分。
 
-四份子项目 README 使用相同的阅读顺序：**学习路线与代码 → 核心概念 → 参数影响与常见问题 → 运行与复习**。数据准备见[数据说明](data/README.md)；[区域拾音](projects/area-pickup/README.md)仍是规划项目，需求与实验记录分别放在 `docs/area-pickup/`。
+四份子项目 README 使用相同的阅读顺序：**学习路线与代码 → 核心概念 → 参数影响与常见问题 → 运行与复习**。具体知识点和参数解释以各项目 README 为准。数据准备见[数据说明](data/README.md)；[区域拾音](projects/area-pickup/README.md)仍是规划项目，需求与实验记录分别放在 `docs/area-pickup/`。
+
+### 后续学习计划
+
+1. 统一信号特征的时间轴和单位，在波形或谱图上叠加特征曲线，记录手写实现与库函数的差异。
+2. 将教学脚本中的顶层演示逐步整理为可复用函数，同时保留便于复习的小例子。
+3. 基于 UrbanSound8K 的官方 fold 建立分类实验，记录数据划分、随机种子、模型、指标和环境版本。
+4. 区域拾音先明确场景、阵列几何、通道同步、采样参数、目标区域和评价指标，再比较算法。
+5. 当某个方向形成稳定入口和独立维护需求时，再考虑拆分仓库。
 
 ## 环境与依赖
 
@@ -70,4 +78,22 @@ python requirements/sync_requirements.py learning/audio-deep-learning/dataloader
 
 可以按“观察输入形状 → 手算一个小例子 → 运行脚本 → 改一项参数 → 解释输出变化”的顺序学习。信号处理的图要结合采样率、帧长和帧移解释；神经网络的输出要结合 batch/channel/spatial 维度解释。当前文件多为教学脚本，直接运行会执行顶层演示代码，有些脚本需要本地数据或会弹出绘图窗口。
 
-具体练习目标、参数影响、运行入口和已知限制见四份子项目 README。整体后续计划见[学习路线](docs/learning-roadmap.md)。
+具体练习目标、参数影响、运行入口和已知限制见四份子项目 README。
+
+## 记录约定
+
+新增练习时，在对应子项目 README 记录代码入口、输入输出形状、可修改参数及其影响、数据路径、实际结果和遇到的问题。功能尚未实现时明确标注；注释与代码不一致时，先按代码的实际行为记录并说明差异。较长的代码模板和图片放在相关子项目 README，根目录保留路线与入口。
+
+实验记录可复制以下清单填写：
+
+```text
+日期与代码版本：
+问题或假设：
+数据来源与划分：
+硬件、采样率、通道数：
+帧长、帧移、窗或特征参数：
+方法、模型与依赖环境：
+运行命令：
+结果与评价指标：
+观察、限制与下一步：
+```
