@@ -1,3 +1,10 @@
+from pathlib import Path as _Path
+import sys as _sys
+_REPO_ROOT = _Path(__file__).resolve().parents[2]
+for _import_path in (str(_REPO_ROOT), str(_Path(__file__).resolve().parent)):
+    if _import_path not in _sys.path:
+        _sys.path.insert(0, _import_path)
+
 from pathlib import Path
 from learning.common.paths import (
     output_dir,

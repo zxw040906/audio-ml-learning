@@ -30,7 +30,28 @@ python requirements/sync_requirements.py learning/neural-network/conv1.py
 python -m pip install -r requirements/neural-network.txt
 ```
 
-首次切换或新建环境时，对目标项目的清单执行一次安装。平时运行入口会同步清单，但不会自动安装/升级包，以免脚本启动时悄悄改动环境。PyTorch、TorchAudio、TorchVision 需要彼此兼容；GPU/CUDA 版本请按本机驱动和 PyTorch 官方安装选择。同步清单读取的是“当前环境实际安装的版本”，因此激活错环境会生成不匹配的清单。直接 `python learning/.../script.py` 不会执行依赖同步；从仓库根目录导入共享路径的脚本也应优先使用统一入口。
+### 两种脚本启动方式
+
+**直接运行**不会同步依赖清单，但可以快速执行脚本。脚本会先将仓库根目录加入 Python 导入路径，因此 `from learning.common.paths import ...` 能正常导入共享路径模块；同时脚本目录也会加入导入路径，供 `plot_set.py` 这类同目录模块使用。仓库根目录执行：
+
+```bash
+python learning/audio-deep-learning/dataloader.py
+```
+
+也可以像下面这样从任意目录使用 Python 和脚本的绝对路径：
+
+```bash
+/home/zxw/anaconda3/envs/pytorch/bin/python \
+  /home/zxw/python_code/project/audio-ml-learning/learning/audio-deep-learning/dataloader.py
+```
+
+**统一入口运行**会先同步该子项目的依赖清单，再执行脚本：
+
+```bash
+python requirements/sync_requirements.py learning/audio-deep-learning/dataloader.py
+```
+
+两种方式都会使用当前选定的 Python 环境。第一次使用环境时，先按对应项目清单安装依赖；运行器只同步清单，不会自动安装或升级包。PyTorch、TorchAudio、TorchVision 需要彼此兼容；GPU/CUDA 版本按本机驱动和 PyTorch 安装选择。同步清单读取当前环境实际安装的版本，因此运行前应确认激活了正确的环境。
 
 ## 路径与本地文件
 

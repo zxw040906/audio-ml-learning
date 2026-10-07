@@ -16,7 +16,7 @@ def plot_waveform(waveform,sr,title="Waveform"):
 def plot_waveform_fft(waveform,sr,n_fft,title="Waveform_FT"):
     waveform = np.array(waveform)
     samples = waveform.size
-    waveform_fft = np.fft.rfft(waveform,n_fft)
+    waveform_fft = np.abs(np.fft.rfft(waveform,n_fft))
     freq_scale = np.linspace(0,sr/2,num=int(n_fft/2)+1)
     plt.figure(figsize=(10,10))
     plt.plot(freq_scale,waveform_fft,linewidth=1)
