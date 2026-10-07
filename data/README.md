@@ -49,3 +49,7 @@ UrbanSound8K 官方评估基于 fold 划分。做实验时应保留官方 fold �
 | `SPEECH_AUDIO_DIR` | 信号处理素材音频目录 | 固定仓库相对路径 |
 
 大型数据和输出已在 `.gitignore` 中排除。提交前确认没有意外加入录音、缓存、TensorBoard event 或模型检查点。
+
+## 改路径配置时的检查
+
+修改 `AUDIO_LEARNING_DATA` 后，UrbanSound8K 的默认根目录会跟着移动；若单独设置 `URBANSOUND8K_ROOT`，则应直接指向同时包含 `audio/` 和 `metadata/` 的目录。修改 `AUDIO_LEARNING_OUTPUT` 后，TensorBoard 命令中的 `--logdir` 也要指向新目录。路径存在但层级不对时，脚本仍可能出现找不到 CSV、音频或日志的错误。

@@ -2,7 +2,7 @@
 
 本目录记录 PyTorch 张量、数据集读取、固定长度/采样率预处理、Mel 频谱和 TensorBoard 可视化。当前还没有训练分类器的完整流程：`dataset_ubs8k.py` 负责产出特征和标签，其他脚本用于理解数据与模型组件。
 
-## 建议阅读顺序
+## 学习路线与代码
 
 1. `tensor.py`：张量类型、形状变换、逐元素运算、矩阵乘法、拼接及 NumPy 转换。
 2. `myclass.py`：Python 类、实例方法和 `__call__` 魔术方法。
@@ -10,6 +10,8 @@
 4. `dataloader.py`：将音频统一成固定采样点数/采样率，再由 `DataLoader` 批量加载。
 5. `dataset_ubs8k.py`：读取 UrbanSound8K 元数据，变为单声道、重采样、裁剪/补零，再计算 Mel 频谱。
 6. `summary_writer*.py`：记录标量、音频、图片和网络结构；比较显式定义层与 `Sequential` 写法。
+
+`test.py` 只打印 PyTorch 版本，用于确认当前解释器；`plot_set.py` 是绘图辅助模块。数据流可以按 **WAV → waveform `[channel,time]` → 重采样/定长 → Mel 频谱 `[channel,mel_bin,frame]` → DataLoader/模型** 来复习。当前脚本只演示各环节，尚未连接成训练分类器。
 
 ## 张量基础与模型结构
 
@@ -33,7 +35,26 @@ YESNO 是随仓库保留的 60 个短语音 WAV，位置为 `data/yesno/waves_ye
 
 ### 绘图函数
 
-`plot_set.py` 提供波形、FFT 与谱图工具。FFT 图应关注幅值而非复数值；FFT 的 `n_fft` 小于波形长度时会截断，大于时会补零。谱图的坐标目前是矩阵索引，并非自动换算的秒和 Hz。
+`plot_set.py` 提供波形、FFT 幅值与谱图工具。FFT 的 `n_fft` 小于波形长度时会截断，大于时会补零；因此改变它不只是改变画图精度。谱图坐标目前是矩阵索引，并非自动换算的秒和 Hz。
+
+`dataset_ubs8k.py` 产生的 `MelSpectrogram` 默认是**功率谱**；当前 `plot_set.py` 的谱图函数调用 `librosa.amplitude_to_db`，这是按幅度量转换。阅读显示出的 dB 数值时要留意这一不一致；功率谱应按功率定义转换。
+
+## 参数影响与常见问题
+
+| 修改项 | 影响 | 需要检查 |
+| --- | --- | --- |
+| `target_sr` | 重采样后的每秒样本数、频率范围 | MelSpectrogram 的 `sample_rate` 要与实际波形一致；重采样后必须再定长 |
+| `target_samples` | 最终波形长度与时长 `target_samples / target_sr` | 值太小会截断声音，太大会增加补零和计算量 |
+| 单声道混合 | 把多个通道平均为一个通道 | 丢失左右声道空间差异；模型输入通道数须一致 |
+| `batch_size/shuffle/drop_last` | 每批样本数、顺序和末批处理 | `batch_size` 增大会占更多内存；`drop_last=True` 会丢掉不足一批的样本 |
+| `dataset.py` 的 `index` | 选取哪条 YESNO 音频 | 值超出数据集长度会报索引错误；换索引后图像和文件名都随之变化 |
+| `n_fft/hop_length` | 每帧频率分辨率与时间帧数量 | 更大的 `n_fft` 通常使频率刻度更细、时间定位更粗；更小的 hop 增加帧数和计算量 |
+| `n_mels` | Mel 特征的频带数与输入高度 | 改动后模型输入形状可能不匹配；过多频带相对 FFT 频点可能出现空滤波器警告 |
+| `Normalize` 的均值/标准差 | 图像像素缩放与颜色分布 | 通道数要匹配；标准差不能为 0；可视化归一化后的 Tensor 不等同于原图 |
+| `Resize/RandomCrop` | 图像高宽及裁剪区域 | 裁剪尺寸不能超过输入；随机裁剪每次结果可能不同；全连接层输入宽度可能需要调整 |
+| CNN 的输入尺寸与通道数 | 卷积输出和 `Linear.in_features` | 现有网络假设 `[N,3,32,32]`；输入改变后固定的 `64×4×4` 可能失效 |
+
+`dataset_ubs8k.py` 的处理顺序是混单声道 → 重采样 → 定长 → Mel 变换。这个顺序保证 `target_samples` 是**目标采样率下**的样本数。`dataloader.py` 也按相同顺序处理 YESNO，便于组成等长 batch。
 
 ## TensorBoard 记录
 
@@ -42,6 +63,8 @@ YESNO 是随仓库保留的 60 个短语音 WAV，位置为 `data/yesno/waves_ye
 - `summary_write_nn.py` 把网络计算图写入 `log_net/`。
 
 运行入口将日志放在 `.local-output/audio-deep-learning/` 下，已由 Git 忽略。可在仓库根目录执行 `tensorboard --logdir .local-output/audio-deep-learning` 查看。务必关闭 `SummaryWriter`；脚本通常调用 `close()`，或在较长实验中使用上下文管理器。
+
+当前 `summary_writer.py` 在写入第 8 条音频时调用 `exit()`，因此后面的 `file1.close()` 不会执行。观察音频日志时若发现最后一条缺失，需考虑写入器尚未正常关闭；这属于现有脚本的实现限制。
 
 ## 运行与依赖
 
@@ -67,3 +90,7 @@ python requirements/sync_requirements.py learning/audio-deep-learning/dataloader
 ```
 
 两种方式都使用当前选定的 Python 环境。YESNO 示例不需要联网。UrbanSound8K 示例需要按 `data/README.md` 准备数据；图像记录脚本需要 `assets/nn.png`。
+
+## 复习检查
+
+能否从 `target_samples` 和 `target_sr` 算出音频时长？为什么定长必须放在重采样后？把 `n_mels` 从 64 改成 128 后，哪一个张量维度会变化，后续模型要检查什么？

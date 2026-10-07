@@ -1,6 +1,6 @@
 # 音频与机器学习学习记录
 
-这是一个以可运行小练习为主的个人学习仓库，记录从离散音频信号分析、神经网络基础到 PyTorch 音频数据管线的学习过程。每个脚本尽量聚焦一个概念；项目 README 解释脚本之间的关系、关键参数与观察重点。
+这是一个以可运行小练习为主的学习仓库，覆盖信号处理、网络结构、梯度训练和音频数据管线。先在子项目 README 理解概念与参数，再对照脚本注释和输出复习；各目录都标明当前实现与尚未完成的部分。
 
 ## 仓库地图
 
@@ -9,13 +9,25 @@
 | `learning/neural-network/` | 感知机、多层前馈网络、卷积、池化和图像张量 | `neuron.py` → `muti_layer.py` → `conv1.py` / `conv2.py` |
 | `learning/speech-signal-processing/` | 时域特征、频谱、STFT 和可视化 | `Time_Process/` 与 `Frequency_Process/` |
 | `learning/audio-deep-learning/` | Tensor、Dataset/DataLoader、音频变换、CNN 与 TensorBoard | `tensor.py` → `dataset.py` → `dataloader.py` |
+| `learning/network_training/` | 损失函数、手动梯度、Autograd 与梯度下降 | `sine_manual_grad.py` → `auto_grad.py` → `manual_grad_nn.py` |
 | `projects/area-pickup/` | 区域拾音方向的后续工程 | `docs/area-pickup/overview.md` |
 | `learning/common/paths.py` | 数据、素材和输出目录的统一约定 | 见“路径与本地文件” |
 | `requirements/` | 按学习项目生成的 Python 依赖清单及统一运行入口 | 见“依赖和运行” |
 
+## 复习路线
+
+1. [语音信号处理](learning/speech-signal-processing/README.md)：从波形、采样率和分帧认识时域与频域特征。
+2. [神经网络基础](learning/neural-network/README.md)：认识神经元、激活函数、卷积、池化和张量形状；[CNN 参数模板](learning/neural-network/README.md#最简-cnn-模板)可按图填写。
+3. [网络训练](learning/network_training/README.md)：从手动求导过渡到 Autograd，理解损失、学习率与梯度清零。
+4. [音频深度学习](learning/audio-deep-learning/README.md)：把音频读取、预处理、Mel 特征和 TensorBoard 串成数据管线。
+
+四份子项目 README 使用相同的阅读顺序：**学习路线与代码 → 核心概念 → 参数影响与常见问题 → 运行与复习**。数据准备见[数据说明](data/README.md)；[区域拾音](projects/area-pickup/README.md)仍是规划项目，需求与实验记录分别放在 `docs/area-pickup/`。
+
 ## 环境与依赖
 
-仓库沿用本机已有的 Conda/Python 环境，不提交环境目录。三个学习子项目分别使用 `requirements/neural-network.txt`、`requirements/speech-signal-processing.txt` 和 `requirements/audio-deep-learning.txt`。清单由 `requirements/sync_requirements.py` 根据对应目录下的导入扫描当前环境中的已安装发行包版本；它不是跨机器锁定文件，换 Python 版本或环境后应重新生成并检查。
+**当前开发与运行环境：Windows 上的 WSL2（Linux）**。仓库和 Conda 环境位于 WSL2 文件系统中；下文的 `python`、`conda`、`tensorboard` 命令都在 WSL2 终端执行，示例绝对路径 `/home/zxw/...` 也是 WSL2 内的路径。在 VS Code 中运行时，选择 WSL2 内对应的 Python 解释器；Windows 原生 Python 环境与这里的依赖和路径不共用。
+
+仓库沿用 WSL2 中已有的 Conda/Python 环境，不提交环境目录。现有依赖清单覆盖神经网络、信号处理和音频深度学习三个目录；新增的网络训练目录尚无独立清单，首次通过统一入口运行其脚本时会生成 `requirements/network_training.txt`。清单由 `requirements/sync_requirements.py` 扫描项目导入并记录当前环境中的版本；它不是跨机器锁定文件，换 Python 版本或环境后应重新生成并检查。
 
 先激活你已经配置好的环境，然后在仓库根目录运行脚本：
 
@@ -32,7 +44,7 @@ python -m pip install -r requirements/neural-network.txt
 
 ### 两种脚本启动方式
 
-**直接运行**不会同步依赖清单，但可以快速执行脚本。脚本会先将仓库根目录加入 Python 导入路径，因此 `from learning.common.paths import ...` 能正常导入共享路径模块；同时脚本目录也会加入导入路径，供 `plot_set.py` 这类同目录模块使用。仓库根目录执行：
+**直接运行**不会同步依赖清单。使用共享路径模块的现有脚本在导入前设置仓库根目录；同目录辅助模块由脚本所在目录解析。仓库根目录执行：
 
 ```bash
 python learning/audio-deep-learning/dataloader.py
@@ -63,4 +75,4 @@ python requirements/sync_requirements.py learning/audio-deep-learning/dataloader
 
 可以按“观察输入形状 → 手算一个小例子 → 运行脚本 → 改一项参数 → 解释输出变化”的顺序学习。信号处理的图要结合采样率、帧长和帧移解释；神经网络的输出要结合 batch/channel/spatial 维度解释。当前文件多为教学脚本，直接运行会执行顶层演示代码，有些脚本需要本地数据或会弹出绘图窗口。
 
-具体练习目标、变量含义、运行入口和注意事项分别见三个子项目 README。整体后续计划见 [`docs/learning-roadmap.md`](docs/learning-roadmap.md)。
+具体练习目标、参数影响、运行入口和已知限制见四份子项目 README。整体后续计划见[学习路线](docs/learning-roadmap.md)。
