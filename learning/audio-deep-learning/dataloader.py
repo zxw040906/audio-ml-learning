@@ -1,27 +1,19 @@
-from pathlib import Path as _Path
-import sys as _sys
-_REPO_ROOT = next(
-    parent for parent in _Path(__file__).resolve().parents
-    if (parent / "learning" / "common" / "paths.py").is_file()
-)
-if str(_REPO_ROOT) not in _sys.path:
-    _sys.path.insert(0, str(_REPO_ROOT))
 from learning.common.paths import (
-    REPO_ROOT, URBANSOUND8K_ROOT, YESNO_AUDIO_DIR, SPEECH_AUDIO_DIR, output_dir
+    YESNO_AUDIO_DIR,
 )
 
-from torch.utils.data import DataLoader ,Dataset
+from torch.utils.data import DataLoader, Dataset
 import torchaudio
 import torch
-import os
+from pathlib import Path
 
 #定义数据集类
 class MyData(Dataset):
     def __init__(self,root_dir,label_dir,target_samples,target_sr):
         self.root_dir = root_dir
         self.label_dir = label_dir
-        self.path = os.path.join(self.root_dir,self.label_dir)
-        self.audio_file = os.listdir(self.path)
+        self.path = Path(self.root_dir) / self.label_dir
+        self.audio_file = sorted(self.path.iterdir())
         self.target_samples = target_samples
         self.target_sr = target_sr
     def reshape_if_necessary(self,waveform):
@@ -40,13 +32,12 @@ class MyData(Dataset):
             waveform = torch.mean(waveform,dim=0,keepdim=True)
         return waveform
     def __getitem__(self, index):
-        audio_name = self.audio_file[index]
-        audio_path = os.path.join(self.path,audio_name)
+        audio_path = self.audio_file[index]
         audio,sr = torchaudio.load(audio_path)
-        audio = self.reshape_if_necessary(audio)
-        audio = self.resample_if_necessary(audio,sr)
         audio = self.mix_if_necessary(audio)
-        return audio,audio_name
+        audio = self.resample_if_necessary(audio,sr)
+        audio = self.reshape_if_necessary(audio)
+        return audio, audio_path.name
     def __len__(self):
         return len(self.audio_file)
 

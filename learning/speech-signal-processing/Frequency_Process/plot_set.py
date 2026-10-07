@@ -1,5 +1,4 @@
 #画图函数
-from random import sample
 import librosa
 import numpy as np
 from matplotlib import pyplot as plt

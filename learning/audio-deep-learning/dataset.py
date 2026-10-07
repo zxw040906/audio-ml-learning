@@ -1,18 +1,10 @@
-from pathlib import Path as _Path
-import sys as _sys
-_REPO_ROOT = next(
-    parent for parent in _Path(__file__).resolve().parents
-    if (parent / "learning" / "common" / "paths.py").is_file()
-)
-if str(_REPO_ROOT) not in _sys.path:
-    _sys.path.insert(0, str(_REPO_ROOT))
 from learning.common.paths import (
-    REPO_ROOT, URBANSOUND8K_ROOT, YESNO_AUDIO_DIR, SPEECH_AUDIO_DIR, output_dir
+    YESNO_AUDIO_DIR,
 )
 
 import torchaudio
-import os
-from plot_set import plot_waveform,plot_waveform_fft,plot_spectrogram # 导入自定义绘图模块
+from pathlib import Path
+from plot_set import plot_waveform, plot_waveform_fft
 from torch.utils.data import Dataset
 
 # 数据集位置
@@ -29,19 +21,19 @@ class Mydataset(Dataset):
         self.data_path = data_path
         self.label_path = label_path
         # 拼接得到音频文件所在完整路径
-        self.path = os.path.join(self.data_path, self.label_path)
+        self.path = str(Path(self.data_path) / self.label_path)
         # 列出目录下所有音频文件名
-        self.audiofile = os.listdir(self.path)
+        self.audiofile = sorted(Path(self.path).iterdir())
 
     def __getitem__(self, index):
         # 根据索引取出对应的音频文件名
-        audio_name = self.audiofile[index]
+        audio_path = self.audiofile[index]
         # 拼接音频文件的完整路径
-        wave_path = os.path.join(self.path, audio_name)
+        wave_path = str(audio_path)
         # 加载音频，得到波形和采样率
         waveform, sr = torchaudio.load(wave_path)
         # 返回波形、采样率和文件名
-        return waveform, sr, audio_name
+        return waveform, sr, audio_path.name
 
     def __len__(self):
         # 返回数据集样本总数
