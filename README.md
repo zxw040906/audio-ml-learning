@@ -21,7 +21,7 @@
 2. [神经网络基础](learning/neural-network/README.md)：从感知机、NumPy 多层前向传播，走到激活函数、卷积、池化和图片张量；用 [CNN 参数模板](learning/neural-network/README.md#最简-cnn-模板)按结构图填写参数并检查输出形状。当前主要验证前向计算，尚未训练 CNN。
 3. [网络训练](learning/network_training/README.md)：用多项式拟合 `sin(x)`，从手动求导过渡到 Autograd 和 `nn.Linear`，理解平方误差、梯度清零、参数更新，以及学习率过大造成的数值发散。
 4. [音频深度学习](learning/audio-deep-learning/README.md)：练习 Tensor、YESNO Dataset/DataLoader、重采样和定长、UrbanSound8K Mel 谱图及 TensorBoard。分类基线尚未完成，需要先确定官方 fold 划分。
-5. [单通道语音增强](learning/speech-enhancement/README.md)：用 LibriSpeech 语音叠加可控白噪声，比较普通卷积、空洞卷积和残差去噪结构。该练习不包含阵列空间处理，不能替代区域拾音实验。
+5. [单通道语音增强](learning/speech-enhancement/README.md)：用 LibriSpeech 语音叠加可控白噪声，学习 SNR、时域卷积、残差去噪和验证评估。它连接单通道音频学习与后续区域拾音的信号建模经验，但尚未实现阵列处理或空间选择，不能视为区域拾音算法。
 
 各子项目 README 使用相同的阅读顺序：**学习路线与代码 → 核心概念 → 参数影响与常见问题 → 运行与复习**。具体知识点和参数解释以各项目 README 为准。数据准备见[数据说明](data/README.md)；[区域拾音](projects/area-pickup/README.md)仍是规划项目，需求与实验记录分别放在 `docs/area-pickup/`。
 
@@ -80,7 +80,7 @@ python requirements/sync_requirements.py learning/audio-deep-learning/dataloader
 
 可以按“观察输入形状 → 手算一个小例子 → 运行脚本 → 改一项参数 → 解释输出变化”的顺序学习。信号处理的图要结合采样率、帧长和帧移解释；神经网络的输出要结合 batch/channel/spatial 维度解释。当前文件多为教学脚本，直接运行会执行顶层演示代码，有些脚本需要本地数据或会弹出绘图窗口。
 
-具体练习目标、参数影响、运行入口和已知限制见四份子项目 README。
+具体练习目标、参数影响、运行入口和已知限制见各学习模块 README。单通道语音增强可作为走向区域拾音的前置练习；区域拾音仍处于需求与实验准备阶段，见 `docs/area-pickup/`。
 
 ## 记录约定
 

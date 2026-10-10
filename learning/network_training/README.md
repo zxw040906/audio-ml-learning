@@ -225,7 +225,7 @@ python learning/network_training/auto_grad.py
 python learning/network_training/manual_grad_nn.py
 ```
 
-`sine_manual_grad.py` 的训练循环可与上述脚本对照，但当前最后一行对 NumPy/Python 标量调用了 `.item()`，在本仓库使用的 NumPy 环境会报错。要运行完整脚本，先把那一行的 `a.item()`、`b.item()` 等换成直接格式化 `a`、`b`、`c`、`d`。`auto_grad.py` 的参数是单元素 PyTorch Tensor，可以调用 `.item()`；它末尾提到 NumPy 的注释沿用了另一份脚本，和实际类型不符。
+`sine_manual_grad.py` 的训练循环可与上述脚本对照，但当前最后一行对 NumPy 标量调用了 `.item()`；NumPy 标量是否支持该方法依赖具体标量类型/版本，稳妥写法是直接格式化 `a`、`b`、`c`、`d`。`auto_grad.py` 的参数是单元素 PyTorch Tensor，可以调用 `.item()`；其末尾注释把参数称为 NumPy 浮点数，与实际类型不符。
 
 NumPy 脚本需要 `numpy`；其余两个脚本需要 `torch`。本目录目前没有已提交的独立依赖清单；首次通过 `requirements/sync_requirements.py` 运行项目脚本会生成当前环境对应的 `requirements/network_training.txt`。
 
