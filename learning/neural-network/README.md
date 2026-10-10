@@ -56,11 +56,13 @@ $$L_{out}=\left\lfloor\frac{L_{in}+2p-d(k-1)-1}{s}+1\right\rfloor,$$
 
 其中输入长度 \(L_{in}\)、核宽 \(k\)、对称 padding \(p\)、stride \(s\)、dilation \(d\) 均以样本/像素计。二维高宽分别套用；仓库当前 `conv2.py` 示例 dilation 默认为 1，因此公式可化为 `floor((in+2p-k)/s)+1`。示例 5×5 输入、3×3 核：valid、stride 1 得 3×3；stride 2 得 2×2（向下取整）；padding 1、stride 1 得 5×5。
 
-不分组卷积的可学习参数量为
+卷积层的可学习参数量为
 
-$$\#\theta=C_{out}\left(C_{in}\frac{k_Hk_W}{g}+1\right),$$
+$$
+N_{\mathrm{params}}=C_{\mathrm{out}}\left(\frac{C_{\mathrm{in}}}{g}k_Hk_W+b\right)
+$$
 
-其中 \(C_{in},C_{out}\) 是通道数，\(g\) 是 groups，末尾的 1 是每个输出通道一个 bias（`bias=False` 时去掉）。空间尺寸和 batch 不增加卷积核参数，因为核在位置间共享。比如 3 输入通道、32 输出通道、5×5 核、groups=1，参数数为 \(32(3·25+1)=2432\)。本仓库 `nn_module.py` 根据配置构造标准 Conv2d，后续 Linear 的参数另计。
+其中 \(C_{\mathrm{in}}\) 和 \(C_{\mathrm{out}}\) 分别是输入、输出通道数，单位为通道；\(g\) 是 groups，要求为正整数并能整除输入和输出通道数；\(k_H,k_W\) 是卷积核高、宽，单位为像素或时间采样点；\(b=1\) 表示 `bias=True`，\(b=0\) 表示 `bias=False`。该式假设标准分组卷积，每组的权重连接 \(C_{\mathrm{in}}/g\) 个输入通道；偏置是每个输出通道一个。空间位置和 batch 不增加参数，因为权重在位置间共享。比如 \(C_{\mathrm{in}}=3\)、\(C_{\mathrm{out}}=32\)、\(k_H=k_W=5\)、\(g=1\)、`bias=True` 时，\(N_{\mathrm{params}}=32(3·25+1)=2432\)。`nn_module.py` 构造标准 `nn.Conv2d` 时默认 `bias=True`；后续 Linear 的参数另计。
 
 感受野表示单个输出位置能依赖输入的空间范围。对连续卷积，令初始 jump \(j_0=1\)、感受野 \(r_0=1\)，每层更新
 
