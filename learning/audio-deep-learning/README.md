@@ -2,6 +2,10 @@
 
 本目录记录 PyTorch 张量、数据集读取、固定长度/采样率预处理、Mel 频谱和 TensorBoard 可视化。当前还没有训练分类器的完整流程：`dataset_ubs8k.py` 负责产出特征和标签，其他脚本用于理解数据与模型组件。
 
+## 学习目标与张量约定
+
+目标是能解释原始波形如何经过 Dataset 预处理形成等长 batch，推导采样点数与时长，并检查特征张量的每一维。TorchAudio 波形约定为 `[channel,time]`，批处理后为 `[batch,channel,time]`；Mel 特征再增加 mel-bin 与 frame 轴，批次形状为 `[batch,channel,mel_bin,frame]`。采样率单位 Hz，样本数除以采样率得到秒。
+
 ## 学习路线与代码
 
 1. `tensor.py`：张量类型、形状变换、逐元素运算、矩阵乘法、拼接及 NumPy 转换。
@@ -26,6 +30,16 @@
 YESNO 是随仓库保留的 60 个短语音 WAV，位置为 `data/yesno/waves_yesno/`。`dataset.py` 先确认 TorchAudio 数据目录可用，再用自定义 `Mydataset` 返回 `(waveform, sample_rate, filename)`；示例读取索引 3 并画波形/频谱。`dataloader.py` 的 `MyData` 通过 `reshape_if_necessary` 截断或在末尾补零到固定样本数，通过 `resample_if_necessary` 统一采样率，并把多声道均值合成单声道，最终由 `DataLoader` 组成 batch。
 
 `reshape_if_necessary` 假设波形形状为 `[channel,time]`。这里的目标 8000 Hz、20000 个样本对应约 2.5 秒；处理顺序是先混声道、重采样，再截断/补零，这样最终长度仍符合设定值。
+
+### Dataset、DataLoader 与批次推导
+
+`dataset.py::Mydataset.__getitem__` 按索引读取一个 WAV，返回 `[C,T]` 波形、采样率和文件名；`__len__` 给出可索引条目数。`dataloader.py::MyData.__getitem__` 加上混声道、重采样与定长变换。默认 collate 将相同形状样本堆叠：若每条为 `[1,20000]` 且 `batch_size=10`，批次波形为 `[10,1,20000]`。等长是可堆叠的前提；不同长度样本若不裁剪/补齐，需要自定义 collate 或 padding。
+
+Dataset 定义“一个索引如何产生样本”，DataLoader 负责按批次取索引、可选打乱、并整理样本。`shuffle=True` 只改变取样顺序，不改变内容；`drop_last=False` 保留最后不足一批的数据。当前 `dataset_ubs8k.py::UrbanSound8K` 返回 `(mel, target_sr, classID)`，但模块底部只读取一个样本作图，尚未实现按官方 fold 训练/验证的分类器。
+
+预处理次序可由单位验证：原波形有 \(T\) 个采样点、原采样率 \(f_s\)，重采样到 \(f_t\) 后时长近似不变，点数约为 \(T f_t/f_s\)；然后裁剪/补零到 \(T_t\)，最终时长严格由目标配置决定，即 \(T_t/f_t\)。YESNO 的 20000/8000=2.5 秒；UrbanSound8K 的 50000/16000=3.125 秒。多声道均值混合会丢失空间差异，不能用于保留阵列线索。
+
+具体调用路径是 `MyData.__getitem__` → `mix_if_necessary` → `resample_if_necessary` → `reshape_if_necessary`；UrbanSound8K 使用同样顺序后调用 `MelSpectrogram`。重采样滤波会影响边界附近样本，所以上述点数关系是时长近似不变的换算，不保证每个波形样本与原始点一一对应。
 
 ### UrbanSound8K：`dataset_ubs8k.py`
 

@@ -6,6 +6,10 @@ __pycache__/
 venv/
 env/
 
+# Dataset copies and generated results inside individual learning projects
+learning/speech-enhancement/data/
+learning/speech-enhancement/output/
+
 # Local-only large datasets, checkpoints, and generated output
 .local-data/
 .local-models/

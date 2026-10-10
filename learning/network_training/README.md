@@ -2,6 +2,10 @@
 
 这份笔记把仓库中的基础网络练习和今天的训练代码连成一条学习路线：先看一个神经元如何计算，再看多层结构如何组合，最后理解模型如何用损失和梯度更新参数。代码是教学示例，重点是计算过程，不是完整的生产训练框架。
 
+## 学习目标与记号
+
+完成本模块后，应能从误差推导 MSE 对预测值和参数的偏导，解释链式法则如何沿计算图反传，并说清 `backward()`、梯度清零和优化器更新的分工。以下将 batch/样本数记为 \(M\)，预测为 \(\hat y_i\)，目标为 \(y_i\)，参数为 \(\theta\)。
+
 ## 学习路线与代码
 
 | 顺序 | 代码 | 本次要回答的问题 |
@@ -105,6 +109,26 @@ loss = Σ(y_pred - y)²
 
 [`loss_func.py`](loss_func.py) 对照了 `L1Loss` 与 `MSELoss`。L1 对误差取绝对值，MSE 对误差平方；较大的误差在 MSE 中受到更重惩罚。`reduction='sum'` 返回所有元素损失之和，`reduction='mean'` 返回平均值，`reduction='none'` 则保留逐元素损失。要注意，脚本注释里的公式若写成除以 `N`，对应的是 `mean`；当前示例显式设为 `sum`，所以没有除以 `N`。
 
+### MSE 的偏导与链式法则
+
+对单输出的 \(M\) 个样本，均方误差定义为
+
+$$L=\frac1M\sum_{i=1}^{M}(\hat y_i-y_i)^2.$$
+
+前提是每个样本一个标量输出；多输出时 PyTorch 的 `mean` 会对所有元素求平均。令 \(e_i=\hat y_i-y_i\)，逐步求导：
+
+$$\frac{\partial L}{\partial \hat y_i}=\frac1M\frac{\partial e_i^2}{\partial e_i}\frac{\partial e_i}{\partial\hat y_i}=\frac{2}{M}e_i.$$
+
+若 \(\hat y_i=a+bx_i+cx_i^2+dx_i^3\)，则继续用链式法则：
+
+$$\frac{\partial L}{\partial a}=\sum_i\frac{\partial L}{\partial\hat y_i}\frac{\partial\hat y_i}{\partial a}=\frac2M\sum_i e_i,$$
+
+$$\frac{\partial L}{\partial b}=\frac2M\sum_i e_ix_i,\quad
+\frac{\partial L}{\partial c}=\frac2M\sum_i e_ix_i^2,\quad
+\frac{\partial L}{\partial d}=\frac2M\sum_i e_ix_i^3.$$
+
+这是 `mean` 版本。`sine_manual_grad.py` 和 `manual_grad_nn.py` 用的是平方误差 `.sum()`，因此公式中没有除以 \(M\)；两种 reduction 的梯度相差样本数因子，学习率需相应重新观察。可手算一例：预测 `[2,0]`、目标 `[1,1]`，误差 `[1,-1]`，MSE 为 1，梯度对预测为 `[1,-1]`；若使用 sum，损失为 2、梯度为 `[2,-2]`。
+
 ### 手动求梯度：`sine_manual_grad.py`
 
 [`sine_manual_grad.py`](sine_manual_grad.py) 用 NumPy 直接按公式计算梯度。设 `error = y_pred - y`，平方误差和对多项式参数的梯度为：
@@ -124,11 +148,15 @@ loss = Σ(y_pred - y)²
 
 Autograd 只负责求梯度，不会自动更新参数。代码仍要在 `torch.no_grad()` 中做参数更新，避免把更新操作也记录进下一轮计算图；更新后把 `.grad` 设为 `None`（或调用 `zero_grad()`），否则 PyTorch 会把下一轮梯度累加到旧梯度上。
 
+以一次梯度下降为例，参数更新式为 \(\theta_{t+1}=\theta_t-\eta\nabla_\theta L\)，其中 \(\eta\) 是学习率。`loss.backward()` 根据链式法则把梯度从标量损失沿算子依赖反向累计到叶子参数的 `.grad`；梯度默认累加，所以每个新批次前须清零。`optimizer.step()` 才应用更新（RMSprop 还会用历史梯度状态调整步长），`zero_grad()` 不改参数。手动更新置于 `torch.no_grad()` 是因为更新本身不应成为模型计算图的一部分。
+
 ### 用 `nn.Linear` 管理参数：`manual_grad_nn.py`
 
 [`manual_grad_nn.py`](manual_grad_nn.py) 把 `[x, x², x³]` 作为每个样本的 3 个输入特征，形状为 `[2000, 3]`。`nn.Linear(3, 1)` 为三项特征学习三个权重，并学习一个偏置；这些参数等价于多项式中的 `b、c、d` 和 `a`。Autograd 通过 `loss.backward()` 计算它们的梯度，代码再遍历 `mynn.model.parameters()` 手动更新，并用 `zero_grad()` 清除旧梯度。
 
 [`auto_param_nn.py`](auto_param_nn.py) 展示同一思路下使用优化器的写法。`x.unsqueeze(-1).pow([1,2,3])` 将每个输入变成 `[x, x², x³]` 三列特征；`nn.Linear(3, 1)` 产生一个预测值。脚本使用 `MSELoss()` 和 RMSprop，每轮依次执行前向计算、`zero_grad()`、`backward()` 和 `step()`。使用优化器时，应在每轮反向传播前清梯度，并在反向传播后调用 `step()` 更新参数；优化器应在循环外创建一次，持续跟踪其状态。
+
+`auto_grad.py` 中 loss 实际用平方误差和，更新为 `parameter -= learning_rate * parameter.grad`，随后把 grad 设为 `None`；`manual_grad_nn.py` 也是 sum reduction，`zero_grad()` 在更新后调用。梯度在何时清零只要保证下一次 backward 前是零即可。`auto_param_nn.py` 用默认 `MSELoss(reduction='mean')` 和 RMSprop，因此损失与梯度尺度不同，不能直接拿它的学习率和手动 sum 版本比较。
 
 ## 按配置搭建 CNN：`train.py`
 

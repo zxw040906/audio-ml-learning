@@ -9,6 +9,7 @@
 | `learning/neural-network/` | 感知机、多层前馈网络、卷积、池化和图像张量 | `neuron.py` → `muti_layer.py` → `conv1.py` / `conv2.py` |
 | `learning/speech-signal-processing/` | 时域特征、频谱、STFT 和可视化 | `Time_Process/` 与 `Frequency_Process/` |
 | `learning/audio-deep-learning/` | Tensor、Dataset/DataLoader、音频变换、CNN 与 TensorBoard | `tensor.py` → `dataset.py` → `dataloader.py` |
+| `learning/speech-enhancement/` | 合成白噪声、时域卷积去噪、训练和 SNR 评估 | `README.md` → `mix_audio.py` → `dataset.py` → `model.py` |
 | `learning/network_training/` | 损失函数、手动梯度、Autograd 与梯度下降 | `sine_manual_grad.py` → `auto_grad.py` → `manual_grad_nn.py` |
 | `projects/area-pickup/` | 区域拾音方向的后续工程 | `docs/area-pickup/overview.md` |
 | `learning/common/paths.py` | 数据、素材和输出目录的统一约定 | 见“路径与本地文件” |
@@ -20,8 +21,9 @@
 2. [神经网络基础](learning/neural-network/README.md)：从感知机、NumPy 多层前向传播，走到激活函数、卷积、池化和图片张量；用 [CNN 参数模板](learning/neural-network/README.md#最简-cnn-模板)按结构图填写参数并检查输出形状。当前主要验证前向计算，尚未训练 CNN。
 3. [网络训练](learning/network_training/README.md)：用多项式拟合 `sin(x)`，从手动求导过渡到 Autograd 和 `nn.Linear`，理解平方误差、梯度清零、参数更新，以及学习率过大造成的数值发散。
 4. [音频深度学习](learning/audio-deep-learning/README.md)：练习 Tensor、YESNO Dataset/DataLoader、重采样和定长、UrbanSound8K Mel 谱图及 TensorBoard。分类基线尚未完成，需要先确定官方 fold 划分。
+5. [单通道语音增强](learning/speech-enhancement/README.md)：用 LibriSpeech 语音叠加可控白噪声，比较普通卷积、空洞卷积和残差去噪结构。该练习不包含阵列空间处理，不能替代区域拾音实验。
 
-四份子项目 README 使用相同的阅读顺序：**学习路线与代码 → 核心概念 → 参数影响与常见问题 → 运行与复习**。具体知识点和参数解释以各项目 README 为准。数据准备见[数据说明](data/README.md)；[区域拾音](projects/area-pickup/README.md)仍是规划项目，需求与实验记录分别放在 `docs/area-pickup/`。
+各子项目 README 使用相同的阅读顺序：**学习路线与代码 → 核心概念 → 参数影响与常见问题 → 运行与复习**。具体知识点和参数解释以各项目 README 为准。数据准备见[数据说明](data/README.md)；[区域拾音](projects/area-pickup/README.md)仍是规划项目，需求与实验记录分别放在 `docs/area-pickup/`。
 
 ### 后续学习计划
 

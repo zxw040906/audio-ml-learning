@@ -2,6 +2,32 @@
 
 本目录从离散音频波形出发，练习时域特征、短时傅里叶变换（STFT）和频谱特征。音频都是本地素材，默认位于 `assets/audio/`，脚本读取时通过 `learning/common/paths.py` 定位。
 
+## 学习目标与统一符号
+
+完成本模块后，应能从采样率和样本索引换算时间、从波形计算帧级 RMS/ZCR、解释 DFT/FFT 与 STFT 的频率轴和帧轴，并能说明绘图实现的边界差异。以下用 \(x[n]\) 表示离散波形，\(n\) 为样本索引，\(f_s\) 为采样率（Hz，即 samples/s），\(N\) 为样本数，\(t\) 为秒。
+
+物理直觉上，波形是空气压力变化的离散记录；采样率决定每秒记录多少个幅值，样本值本身不携带秒或 Hz 单位，必须结合采样率解释。
+
+## 数字音频：采样点、时间与频率
+
+### 从连续时间到样本索引
+
+理想采样写为 \(x[n]=x_c(n/f_s)\)：连续信号 \(x_c(t)\) 每隔 \(T_s=1/f_s\) 秒取一个值。假设采样时钟均匀且采样率固定；真实录音还会受抗混叠滤波、时钟误差和量化影响，本仓库脚本没有模拟这些硬件误差。
+
+由 \(t_n=nT_s\) 得到
+
+$$t_n=\frac{n}{f_s},\qquad n=t f_s.$$
+
+其中 \(t_n\) 单位为秒，\(n\) 是整数样本索引。持续 \(N\) 个样本的记录时长按样本间隔计为 \(N/f_s\) 秒（最后一个样本时间戳为 \((N-1)/f_s\)）。例如 \(f_s=16000\) Hz、\(N=32000\)，时长为 \(32000/16000=2\) 秒；这正是语音增强数据的 2 秒长度设置。帧长 \(L\) 和帧移 \(H\) 对应 \(L/f_s\) 与 \(H/f_s\) 秒；例如 1024/16000=64 ms，512/16000=32 ms。
+
+### 采样率改变与频率刻度
+
+正弦 \(x[n]=\cos(2\pi f_0 n/f_s)\) 的离散角频率为 \(\omega_0=2\pi f_0/f_s\) rad/sample，因此 \(f_0=\omega_0 f_s/(2\pi)\) Hz。若只改变 \(f_s\) 标注而不重采样，同一序列会被解释成不同的物理频率和时长；真正重采样需要插值/抗混叠滤波。`audio-deep-learning/dataloader.py` 使用 `torchaudio.functional.resample`，且在重采样后定长，故 `target_samples/target_sr` 才是目标时长。
+
+均匀采样要无混叠地表示最高频率 \(f_{max}\)，理想前提是信号带限且 \(f_s>2f_{max}\)（Nyquist 条件）；超出 Nyquist 频率的成分会折叠到低频。仓库示例读取已有 WAV，并未自行实现抗混叠采集链路。
+
+对照实现：`learning/common/paths.py` 提供素材路径；模块脚本用 `librosa.load(..., sr=None)` 保留文件采样率。`RMS.py` 的帧长是 1024 点，实际秒数须使用读入的 `sample_rate`，不能照抄注释中的 48 kHz 示例。
+
 ## 学习路线与代码
 
 按 **采样率与波形 → 分帧 → 幅值包络/RMS/ZCR → FFT/STFT → 谱质心** 的顺序阅读。时域特征回答“某段时间的振幅和变化如何”，频域特征回答“哪些频率成分更强”，STFT 则把频率分析放回连续的时间帧上。手写版本帮助理解步骤，librosa 版本用于对照边界与默认参数。
@@ -11,6 +37,22 @@
 `bird.wav`、`time.wav`、`water.wav` 是示例音频。使用 `librosa.load(..., sr=None)` 保留文件原始采样率；省略 `sr=None` 时 librosa 会默认重采样到 22050 Hz。采样率决定样本索引和时间/频率刻度的换算，画图或比较音频前要确认各信号的采样率一致。部分示例只读取前 5 秒。
 
 ## 时域特征
+
+### RMS、功率、SNR 与分贝
+
+对长度为 \(L\) 的一帧 \(x[n]\)，均方值（离散平均功率代理）与 RMS 为
+
+$$P_x=\frac{1}{L}\sum_{n=0}^{L-1}x[n]^2,\qquad x_{\mathrm{RMS}}=\sqrt{P_x}=\sqrt{\frac{1}{L}\sum_{n=0}^{L-1}x[n]^2}.$$
+
+前提是样本使用一致的幅值标度；若幅值以伏特表示，\(P_x\) 单位为 V²，RMS 为 V。平方消除正负抵消，再取平均避免长度影响，开方把量纲恢复为幅值。`Time_Process/RMS.py::Calc_RMS` 正是按帧执行 `sqrt(mean(frames**2))`。手算 `[1,-1,0,2]` 得 \(P=(1+1+0+4)/4=1.5\)，RMS \(=\sqrt{1.5}\approx1.225\)。
+
+若信号是电压且负载电阻不变，平均物理功率与均方电压成正比；不知负载时，称 \(P_x\) 为功率代理更严谨。信号与噪声平均功率分别为 \(P_s,P_n\)，则
+
+$$\mathrm{SNR}_{dB}=10\log_{10}\left(\frac{P_s}{P_n}\right)=20\log_{10}\left(\frac{\mathrm{RMS}_s}{\mathrm{RMS}_n}\right).$$
+
+第二个等号基于相同样本数、相同标度下 \(P=\mathrm{RMS}^2\)。功率比 10 对应 10 dB；幅值比 10 对应 20 dB。语音增强中常以残差 \(e=y-s\) 作为噪声估计，计算 \(10\log_{10}(P_s/P_e)\)；它是波形指标，不等价于主观听感。具体缩放见 [`../speech-enhancement/README.md`](../speech-enhancement/README.md)。
+
+SNR 的 dB 是相对量，必须说明参考信号和误差如何定义。`Time_Process/RMS.py::Calc_RMS` 计算帧级 RMS，但本脚本没有输出 SNR；这里的 SNR 推导用于理解语音增强评估与噪声合成。
 
 ### 幅值包络：`Time_Process/Amplitude_Envelope.py`
 
@@ -35,6 +77,26 @@
 主要步骤是补零、分帧、乘 Hann 窗、逐帧做实数 FFT，再把幅度平方换算为功率 dB。`frame_size=1024` 控制频率分辨率，`hop_size=512` 控制时间采样密度；较长帧通常带来更细频率分辨率但时间定位变粗。实数 FFT 只保留非负频率，频点 `k` 对应 `k × sr / n_fft` Hz。功率转 dB 使用 `10 log10(P)`，幅度转 dB 使用 `20 log10(A)`。绘图纵轴刻度由频点换算为 Hz。
 
 当前数组形状为 `[时间帧, 频率 bin]`，直接传给 `imshow` 时横轴是频率、纵轴是时间；代码却把纵轴刻度标成 Hz。复习时以数组形状为准，要让频率在纵轴需转置数组并同步改坐标。
+
+### DFT、FFT 与 STFT 的推导
+
+有限长帧 \(x[n]\), \(0\le n<N\) 的 DFT 定义为
+
+$$X[k]=\sum_{n=0}^{N-1}x[n]e^{-j2\pi kn/N},\quad k=0,\ldots,N-1.$$
+
+它把帧表示成 \(N\) 个离散复指数基底的加权和；\(X[k]\) 是复数，模长含幅值信息，相角含相位。逆变换为 \(x[n]=\frac1N\sum_{k=0}^{N-1}X[k]e^{j2\pi kn/N}\)。频点间隔 \(\Delta f=f_s/N\)，第 \(k\) 个频点对应 \(kf_s/N\) Hz。FFT 是计算同一个 DFT 的快速算法，并非另一种变换。
+
+手算例：\(N=4\)、\(x=[1,0,-1,0]\)，则 \(X[0]=0\)，\(X[1]=1+(-1)e^{-j\pi/2}=1+j\)，说明 DFT 系数可带相位；实际仓库图通常取 `abs`，因此不展示相位。实值帧的负频率部分由共轭对称决定，偶数 \(N\) 时 `np.fft.rfft` 返回 \(N/2+1\) 个非负频点。
+
+STFT 在 DFT 前截取局部帧并乘窗：
+
+$$x_m[n]=x[n+mH]w[n],\qquad X(m,k)=\sum_{n=0}^{N-1}x[n+mH]w[n]e^{-j2\pi kn/N}.$$
+
+这里 \(m\) 是帧号、\(H\) 是帧移（samples）、\(w[n]\) 是窗函数；帧中心/起点取决于边界约定。窗降低有限帧截断导致的谱泄漏；较长 \(N\) 提高频率分辨率，但聚合更长时间区间。`STFT.py` 显式补齐尾部、分帧、乘 `np.hanning` 并逐帧 `rfft`；`STFT_librosa.py` 调用 `librosa.stft`，默认中心补边等约定可能造成帧数不同。
+
+手写脚本的 `waveform_pow=abs(X)**2/n_fft` 是 FFT 系数模平方并除以 \(N\) 的显示量，并非带窗能量校正、单边谱倍增后的严格物理功率谱密度。其 dB 使用 `10 log10`，与功率型量匹配；零值会产生 `-inf`。`plot_set.py::plot_waveform_fft` 绘制未归一化幅值，`plot_spectrogram` 用 `amplitude_to_db`，调用者须确认传入的是幅度还是功率。当前绘图未统一窗增益或功率谱归一化，适合教学观察，不宜将跨设置绝对 dB 当作校准测量。
+
+代码与公式的对应关系：`STFT.py` 中 `waveform_frames` 为 `[frame, sample]`，`waveform_stft` 为 `[frame, frequency_bin]`；`np.fft.rfft(..., n_fft)` 实现每帧 DFT 的非负频率部分。该脚本 imshow 直接显示 `[frame,bin]`，所以横轴是 bin、纵轴是 frame；现有 y tick 却按 Hz 标注，图轴与数据排列不一致。`STFT_librosa.py` 的复数矩阵则为 `[frequency_bin,frame]`。两者应先统一转置/坐标和窗、边界约定再比较数值。
 
 ### librosa STFT：`Frequency_Process/STFT_librosa.py`
 

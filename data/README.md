@@ -38,6 +38,8 @@ UrbanSound8K 官方评估基于 fold 划分。做实验时应保留官方 fold �
 
 ## 统一路径配置
 
+新增数据集默认只放本地，不上传到 GitHub。对于项目自带、路径写在脚本中的数据，应在相应子项目 `.gitignore` 规则中排除；当前语音增强练习的 `learning/speech-enhancement/data/` 与 `learning/speech-enhancement/output/` 均为本地目录。不要因为文件体积小或来自公开数据集就把数据副本加入提交。
+
 `learning/common/paths.py` 集中管理路径：
 
 | 名称 | 默认位置/用途 | 可配置变量 |
