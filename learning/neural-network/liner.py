@@ -7,7 +7,7 @@ from IPython.display import display
 
 #1.定位图片并转换为 Tensor
 SCRIPT_DIR = Path(__file__).resolve().parent
-img_path = SCRIPT_DIR / "assets" / "zxw.jpg"
+img_path = SCRIPT_DIR / "assets" / "image.jpg"
 with Image.open(img_path) as img:
     img = img.convert("RGB")
 

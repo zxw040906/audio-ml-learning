@@ -14,6 +14,8 @@ learning/speech-enhancement/output/
 .local-data/
 .local-models/
 .local-output/
+# Personal image used by neural-network examples; keep the local copy out of Git.
+learning/neural-network/assets/zxw.jpg
 learning/audio-deep-learning/data/urbansound8k/audio/
 # UrbanSound8K 本地数据集（CSV 元数据及 fold 音频）
 learning/audio-deep-learning/data/audio/

@@ -9,13 +9,13 @@ from IPython.display import display
 #1.定位图片并转换为 Tensor
 """
 图片路径最好不要写成相对终端目录的字符串，
-例如 `"assets/zxw.jpg"`。这种写法会随着你从哪个目录启动程序而改变含义。
+例如 `"assets/image.jpg"`。这种写法会随着你从哪个目录启动程序而改变含义。
 在你的脚本中复制下面的代码，用 `Path(__file__).resolve().parent` 先取得当前 `.py` 文件所在目录，再拼接图片相对位置：
 这适合图片跟某个脚本/项目一起保存的情况；即使从仓库根目录、别的工作目录或用脚本绝对路径启动，都能找到同一张图片。
 `Path` 的 `/` 运算符会按当前操作系统拼接路径，不需要手动写 `/` 或 `\\`。
 """
 SCRIPT_DIR = Path(__file__).resolve().parent
-img_path = SCRIPT_DIR / "assets" / "zxw.jpg"
+img_path = SCRIPT_DIR / "assets" / "image.jpg"
 with Image.open(img_path) as img:
     img = img.convert("RGB")
 

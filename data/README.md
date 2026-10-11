@@ -32,7 +32,7 @@ UrbanSound8K 官方评估基于 fold 划分。做实验时应保留官方 fold �
 
 - `learning/speech-signal-processing/assets/audio/`：`bird.wav`、`time.wav`、`water.wav`，供时域和频域特征练习使用。
 - `learning/audio-deep-learning/assets/nn.png`：TensorBoard 图像变换练习。
-- `learning/neural-network/assets/zxw.jpg`：卷积与池化图像练习。
+- 神经网络卷积与池化练习的图片由使用者自行准备，见[图片替换说明](../learning/neural-network/README.md#图片路径示例)。
 
 这些素材随当前仓库提供。运行前可检查文件存在；Matplotlib/图片显示需要可用的图形后端。
 

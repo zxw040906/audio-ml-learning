@@ -22,7 +22,7 @@ padding计算:
 padding = (after_dim - 1) * stride + kernel_size - before_dim
 """
 #此处为二维卷积的图像验证测试
-img_path = str(Path(__file__).resolve().parent / "assets" / "zxw.jpg")
+img_path = str(Path(__file__).resolve().parent / "assets" / "image.jpg")
 img = Image.open(img_path)
 trans_tensor = torchvision.transforms.ToTensor()
 img_tensor = trans_tensor(img)

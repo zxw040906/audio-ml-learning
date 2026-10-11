@@ -16,7 +16,7 @@ import torchvision
 from torch.utils.tensorboard import SummaryWriter
 
 
-img_path = Path(__file__).resolve().parent / "assets" / "zxw.jpg"
+img_path = Path(__file__).resolve().parent / "assets" / "image.jpg"
 img = Image.open(img_path).convert("RGB")
 trans_tensor = torchvision.transforms.ToTensor()
 img_tensor = trans_tensor(img)

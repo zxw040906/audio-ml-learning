@@ -74,7 +74,7 @@ $$j_l=j_{l-1}s_l,\qquad r_l=r_{l-1}+(k_l-1)d_lj_{l-1}.$$
 
 ### 池化与图片卷积
 
-`pooling.py` 将 `assets/zxw.jpg` 转为 `[C,H,W]` Tensor，再增加 batch 维得到 `[1,C,H,W]`。当前 forward 使用均值池化；将其替换为最大池化，可比较两者如何汇总局部区域。TensorBoard 日志写入 `.local-output/neural-network/log_network/`。
+`pooling.py` 将 `assets/image.jpg` 转为 `[C,H,W]` Tensor，再增加 batch 维得到 `[1,C,H,W]`。请先按[图片替换说明](#图片路径示例)准备自己的图片。当前 forward 使用均值池化；将其替换为最大池化，可比较两者如何汇总局部区域。TensorBoard 日志写入 `.local-output/neural-network/log_network/`。
 
 `pic_process_(conv2test).py` 使用 `nn.Conv2d(3, 3, kernel_size=2, stride=1, padding=1)` 处理图片，并把模型图写入 `.local-output/neural-network/log_conv/`。卷积核是随机初始化的，示例用途是观察数据流和形状，不代表有意义的图像增强。
 
@@ -207,7 +207,9 @@ class MyNetwork(nn.Module):
 
 ## 图片路径示例
 
-不要直接写 `"assets/zxw.jpg"`：它是相对于终端当前目录的路径，启动位置变化时可能找不到文件。图片随脚本保存时，用 `Path(__file__)` 定位脚本目录：
+图片练习使用本地文件 `learning/neural-network/assets/image.jpg`。克隆仓库后，创建 `learning/neural-network/assets/` 目录（若不存在），把自己选择的图片复制进去并命名为 `image.jpg`。可使用 JPEG 或 PNG 等 Pillow 支持的格式；若使用其他文件名或扩展名，请同时修改下面示例中的文件名，以及 `liner.py`、`nonliner.py`、`pooling.py` 和 `pic_process_(conv2test).py` 中拼接图片路径的位置。个人图片不会随仓库提交。替换图片后，确认图片可由 Pillow 打开；卷积示例按 RGB 三通道读取，因此会将图片转换成 RGB。`liner.py` 的 `nn.Linear(1076, 720)` 还要求图片宽度为 1076，否则需同步调整 `in_features`。
+
+不要直接写 `"assets/image.jpg"`：它是相对于终端当前目录的路径，启动位置变化时可能找不到文件。图片随脚本保存时，用 `Path(__file__)` 定位脚本目录：
 
 ```python
 from pathlib import Path
@@ -217,7 +219,7 @@ from IPython.display import display
 
 # __file__ 是当前 .py 文件的路径；parent 是它所在目录。
 script_dir = Path(__file__).resolve().parent
-image_path = script_dir / "assets" / "zxw.jpg"
+image_path = script_dir / "assets" / "image.jpg"
 
 # 打开图片并统一成 RGB 三通道。
 with Image.open(image_path) as img:
@@ -238,7 +240,7 @@ display(img)
 from learning.common.paths import SPEECH_AUDIO_DIR, REPO_ROOT
 
 audio_path = SPEECH_AUDIO_DIR / "bird.wav"
-image_path = REPO_ROOT / "learning" / "neural-network" / "assets" / "zxw.jpg"
+image_path = REPO_ROOT / "learning" / "neural-network" / "assets" / "image.jpg"
 ```
 
 ## 在 VS Code 中单独调试代码块
@@ -285,7 +287,7 @@ python requirements/sync_requirements.py learning/neural-network/pooling.py
 python -m pip install -r requirements/neural-network.txt
 ```
 
-PyTorch 用于张量和神经网络运算，TorchVision 用于图像变换，Pillow 用于读写图片，NumPy 用于多层网络示例，TensorBoard 用于记录模型图。图片练习使用 `assets/zxw.jpg`；运行会显示图片窗口的脚本需要可用的图形界面。
+PyTorch 用于张量和神经网络运算，TorchVision 用于图像变换，Pillow 用于读写图片，NumPy 用于多层网络示例，TensorBoard 用于记录模型图。图片练习需要先按[图片替换说明](#图片路径示例)准备本地 `assets/image.jpg`；运行会显示图片窗口的脚本需要可用的图形界面。
 
 ## 复习检查
 
