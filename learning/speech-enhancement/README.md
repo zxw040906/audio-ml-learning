@@ -47,13 +47,17 @@ python learning/speech-enhancement/evaluate.py
 
 单通道录音可用加性模型表示为
 
-$$y[t]=s[t]+n[t],$$
+$$
+y[t]=s[t]+n[t]
+$$
 
 其中 $s[t]$ 是干净语音，$n[t]$ 是噪声，$y[t]$ 是混合波形；下标 $t$ 表示离散样本索引，样本幅值在本实验中为无量纲浮点数。模型假设噪声与语音按样本相加，未描述混响、非线性削波、时变麦克风响应或阵列空间效应。白噪声在生成模型中是各样本独立同分布的随机噪声；有限长度样本的经验均值和方差不保证恰好为理论值。
 
 对有 $T$ 个样本的序列 $x[t]$，平均平方功率定义为
 
-$$P_x=\frac{1}{T}\sum_{t=0}^{T-1}x[t]^2.$$
+$$
+P_x=\frac{1}{T}\sum_{t=0}^{T-1}x[t]^2
+$$
 
 它是同一幅值标度下比较能量强弱的功率代理；若是电压且负载相同，物理平均功率与均方电压成正比。由于 `add_noise()` 对等长序列分别取 `np.mean(x**2)`，变量 `clean_power` 和 `noise_power` 就对应这个定义。
 
@@ -61,7 +65,9 @@ $$P_x=\frac{1}{T}\sum_{t=0}^{T-1}x[t]^2.$$
 
 `noise_type.py::generate_low_frequency_noise(length, a=0.95, seed=42)` 使用 `np.random.default_rng(seed)` 创建局部随机数生成器，再由 `standard_normal(length)` 生成长度为 `length` 的标准正态白噪声序列 $w[n]$。逐样本递推
 
-$$v[n]=a v[n-1]+(1-a)w[n],$$
+$$
+v[n]=a v[n-1]+(1-a)w[n]
+$$
 
 其中实现的初始值为 $v[0]=(1-a)w[0]$。$a=0.95$ 使前一采样状态保留较多、每一步新噪声输入权重较小，因此生成的合成一阶低通随机噪声更平滑、能量更集中于低频；同一长度和种子会生成可复现序列。它是合成噪声模型，并不等同于真实汽车发动机噪声。
 
@@ -81,23 +87,31 @@ $$v[n]=a v[n-1]+(1-a)w[n],$$
 
 目标信噪比 $S$ dB 定义为干净信号功率与缩放后噪声功率的比值：
 
-$$S=10\log_{10}\left(\frac{P_s}{P_{\alpha n}}\right).$$
+$$
+S=10\log_{10}\left(\frac{P_s}{P_{\alpha n}}\right)
+$$
 
 先将分贝式两侧除以 10 并取 10 次幂：
 
-$$10^{S/10}=\frac{P_s}{P_{\alpha n}}.$$
+$$
+10^{S/10}=\frac{P_s}{P_{\alpha n}}
+$$
 
 若缩放系数 $\alpha$ 是实数，缩放后功率为
 
-$$P_{\alpha n}=\frac1T\sum_t(\alpha n[t])^2=\alpha^2\frac1T\sum_tn[t]^2=\alpha^2P_n.$$
+$$
+P_{\alpha n}=\frac{1}{T}\sum_t(\alpha n[t])^2=\alpha^2\frac{1}{T}\sum_tn[t]^2=\alpha^2P_n
+$$
 
 代回目标比值并解 $\alpha$：
 
-$$10^{S/10}=\frac{P_s}{\alpha^2P_n}
+$$
+10^{S/10}=\frac{P_s}{\alpha^2P_n}
 \quad\Longrightarrow\quad
 \alpha^2=\frac{P_s}{P_n10^{S/10}}
 \quad\Longrightarrow\quad
-\alpha=\sqrt{\frac{P_s}{P_n10^{S/10}}}.$$
+\alpha=\sqrt{\frac{P_s}{P_n10^{S/10}}}
+$$
 
 取正根是因为只调整噪声幅度，不翻转其符号。最终混合波形为 $y=s+\alpha n$。`mix_audio.py::add_noise` 逐项实现上述运算；输入必须是一维、等长且功率为正。手算检查：若 $P_s=1$、$P_n=4$、目标 $S=0$ dB，则 $\alpha=\sqrt{1/4}=0.5$，缩放噪声功率变为 1，信噪比为 0 dB。目标 SNR 越低，分母中的 $10^{S/10}$ 越小，噪声缩放越大。
 
@@ -107,13 +121,17 @@ $$10^{S/10}=\frac{P_s}{\alpha^2P_n}
 
 训练代码使用波形均方误差。对 $T$ 个样本，模型输出 $\hat s[t]$，干净目标为 $s[t]$，则
 
-$$L_{MSE}=\frac1T\sum_{t=0}^{T-1}(\hat s[t]-s[t])^2.$$
+$$
+L_{MSE}=\frac{1}{T}\sum_{t=0}^{T-1}(\hat{s}[t]-s[t])^2
+$$
 
 前提是预测与目标对齐且同长度。它惩罚每个采样点的平方误差；`train.py` 使用 `nn.MSELoss()` 默认 mean reduction，对 batch 和时间元素求均值。
 
 评价脚本将误差 $e[t]=\hat s[t]-s[t]$ 视为残留噪声，并计算
 
-$$\mathrm{SNR}_{out}=10\log_{10}\left(\frac{\sum_t s[t]^2}{\sum_t e[t]^2}\right).$$
+$$
+\mathrm{SNR}_{\mathrm{out}}=10\log_{10}\left(\frac{\sum_t s[t]^2}{\sum_t e[t]^2}\right)
+$$
 
 令 $P_s=T^{-1}\sum_ts[t]^2$、$P_e=T^{-1}\sum_te[t]^2$，则分子分母同除以 $T$，比值不变，故也等于 $10\log_{10}(P_s/P_e)$。`evaluate.py::calculate_snr` 对一条波形计算该值；`evaluate_batch.py::calculate_snr` 沿每条样本的时间轴分别计算。两者均用 `1e-12` 防止误差功率为零时除零。
 
@@ -123,13 +141,17 @@ MSE 与输出 SNR 的分子分母角色不同：对固定目标能量的同一�
 
 模型调用前把 `[B,T]` 变为 `[B,1,T]`，其中 $B$ 是批大小、1 是单声道通道、$T$ 是时间采样点；逐层卷积后再 squeeze 回 `[B,T]`。`model.py` 的各卷积均为 `kernel_size=9`、stride 默认 1、bias 默认启用。dilation 为 $d$ 时，有效核宽为 $k_{eff}=d(k-1)+1$，一维输出长度为
 
-$$T_{out}=\left\lfloor\frac{T+2p-d(k-1)-1}{s}+1\right\rfloor,$$
+$$
+T_{\mathrm{out}}=\left\lfloor\frac{T+2p-d(k-1)-1}{s}+1\right\rfloor
+$$
 
 其中 $p$ 是左右各自的 padding，$s$ 是 stride。代码对每层使用 $p=d(k-1)/2$，本模型的核宽为奇数且 stride=1，因此长度保持为 $T$。
 
 单个输出位置、输出通道 $o$ 的计算是对所有输入通道和核位置加权求和再加偏置：
 
-$$z_{o,t}=b_o+\sum_{c=0}^{C_{in}-1}\sum_{q=0}^{k-1}w_{o,c,q}\,x_{c,ts-p+qd}.$$
+$$
+z_{o,t}=b_o+\sum_{c=0}^{C_{\mathrm{in}}-1}\sum_{q=0}^{k-1}w_{o,c,q}\,x_{c,ts-p+qd}
+$$
 
 该索引形式描述 stride 与 dilation 的采样位置；越界位置由 padding 零补齐。对 `SimpleDenoisingCNN`，第一层第一个窗口是输入 9 点与 9 个卷积权重逐项乘积求和，加一个 bias；ReLU 再逐点执行 $\max(0,z)$。
 
@@ -143,7 +165,9 @@ $$
 
 感受野按层计算。设初值 $r_0=1$ 个输入样本、jump $j_0=1$，第 $l$ 层 stride 为 $s_l$、核宽 $k_l$、dilation 为 $d_l$，则
 
-$$j_l=j_{l-1}s_l,\qquad r_l=r_{l-1}+(k_l-1)d_lj_{l-1}.$$
+$$
+j_l=j_{l-1}s_l,\qquad r_l=r_{l-1}+(k_l-1)d_lj_{l-1}
+$$
 
 前提是串接的规则一维卷积；jump 表示相邻输出点在原输入上的间隔，感受野是一个输出可依赖的输入点跨度。普通三层网络每层 $k=9,d=1,s=1$：$r_1=1+8=9$，$r_2=9+8=17$，$r_3=17+8=25$ 个采样点，即 16 kHz 下跨度约 25/16000=1.5625 ms。
 
@@ -163,7 +187,9 @@ $$j_l=j_{l-1}s_l,\qquad r_l=r_{l-1}+(k_l-1)d_lj_{l-1}.$$
 
 令混合输入 $y=s+n$，网络支路估计噪声 $\hat n=f_\theta(y)$，最终干净估计为
 
-$$\hat s=y-\hat n.$$
+$$
+\hat{s}=y-\hat{n}
+$$
 
 若初始化末层 weight 与 bias 都为零，则任意支路特征经末层线性映射后 $\hat n=0$，于是初始化时 $\hat s=y$，即模型从恒等映射开始。训练仍通过 `MSELoss(\hat s,s)` 的误差更新网络；对减法关系，$\partial\hat s/\partial\hat n=-1$，故梯度会沿预测噪声支路反传。零初始化只保证最终层输出初始为零，不表示中间层权重为零，也不保证训练后必然去噪成功。实现位于 `ResidualDenoisingCNN.__init__` 与 `forward`。
 
