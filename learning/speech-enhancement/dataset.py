@@ -5,6 +5,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from mix_audio import add_noise
 from noise_type import generate_low_frequency_noise
+from audio_utils import calculate_snr
 
 
 class SpeechEnhancementDataset(Dataset):
@@ -153,9 +154,6 @@ if __name__ == "__main__":
 
     clean_np = low_clean.numpy().astype(np.float64)
     mixture_np = low_mixture.numpy().astype(np.float64)
-    error_np = mixture_np - clean_np
-    input_snr = 10 * np.log10(
-        np.sum(clean_np ** 2) / np.sum(error_np ** 2)
-    )
+    input_snr = calculate_snr(clean_np, mixture_np)
 
     print(f"低通噪声输入 SNR: {input_snr:.2f} dB")

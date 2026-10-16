@@ -1,5 +1,8 @@
 import numpy as np
 
+from mix_audio import add_noise
+from audio_utils import calculate_snr
+
 
 def generate_low_frequency_noise(length, a=0.95, seed=42):
     """
@@ -31,32 +34,12 @@ def generate_low_frequency_noise(length, a=0.95, seed=42):
     return noise
 
 def scale_noise_to_snr(clean, noise, snr_db):
+    """按目标 SNR 缩放噪声，保留旧接口并复用 `add_noise()` 的实现。
+
+    输入为等长的一维干净信号和噪声，`snr_db` 单位为 dB；返回缩放后的噪声。
     """
-    根据干净语音的功率，把噪声缩放到目标 SNR。
-
-    参数:
-        clean: 干净语音数组
-        noise: 原始噪声数组
-        snr_db: 目标 SNR,单位 dB
-
-    返回:
-        scaled_noise: 缩放后的噪声数组
-    """
-
-    # 计算干净语音的平均功率
-    clean_power = np.mean(clean**2)
-
-    # 计算原始噪声的平均功率
-    noise_power = np.mean(noise**2)
-
-    # 根据目标 SNR 计算需要的噪声功率
-    target_noise_power = clean_power/(pow(10,snr_db/10))
-
-    # 计算幅度缩放系数
-    scale = np.sqrt(target_noise_power/noise_power)
-
-    # 返回缩放后的噪声
-    return noise * scale
+    _, scaled_noise = add_noise(clean, noise, snr_db)
+    return scaled_noise
 
 if __name__ == "__main__":
 
@@ -138,8 +121,6 @@ if __name__ == "__main__":
 
     scaled_noise = scale_noise_to_snr(clean, noise, 5)
 
-    input_snr = 10 * np.log10(
-        np.mean(clean ** 2) / np.mean(scaled_noise ** 2)
-    )
+    input_snr = calculate_snr(clean, clean + scaled_noise)
 
     print(f"实际 SNR: {input_snr:.2f} dB")

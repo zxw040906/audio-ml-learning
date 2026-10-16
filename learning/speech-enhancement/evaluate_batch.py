@@ -12,28 +12,7 @@ from model import (
     ResidualDenoisingCNN,
 )
 from train import split_by_speaker
-
-
-def calculate_snr(clean, signal):
-    """计算每条语音的参考波形SNR。"""
-
-    clean = clean.astype(np.float64)
-    signal = signal.astype(np.float64)
-
-    error = signal - clean
-
-    clean_power = np.sum(clean ** 2, axis=1)
-    error_power = np.sum(error ** 2, axis=1)
-
-    # 防止零功率造成数值错误
-    eps = 1e-12
-
-    snr = 10 * np.log10(
-        np.maximum(clean_power, eps)
-        / np.maximum(error_power, eps)
-    )
-
-    return snr
+from audio_utils import calculate_snr, calculate_snr_improvement
 
 
 @torch.no_grad()
@@ -42,6 +21,7 @@ def evaluate_model(model, loader):
 
     all_input_snr = []
     all_output_snr = []
+    all_improvements = []
 
     for mixture, clean in loader:
         predicted = model(mixture)
@@ -57,14 +37,18 @@ def evaluate_model(model, loader):
         output_snr = calculate_snr(
             clean_np, predicted_np
         )
+        improvement = calculate_snr_improvement(
+            clean_np, mixture_np, predicted_np
+        )
 
         all_input_snr.extend(input_snr.tolist())
         all_output_snr.extend(output_snr.tolist())
+        all_improvements.extend(improvement.tolist())
 
     input_snr = np.array(all_input_snr)
     output_snr = np.array(all_output_snr)
 
-    improvement = output_snr - input_snr
+    improvement = np.array(all_improvements)
 
     return input_snr, output_snr, improvement
 

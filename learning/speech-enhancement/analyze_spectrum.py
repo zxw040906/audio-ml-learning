@@ -1,10 +1,6 @@
-from pathlib import Path
-
 import numpy as np
-import soundfile as sf
-import matplotlib.pyplot as plt
 
-from noise_type import generate_low_frequency_noise
+from audio_utils import calculate_band_and_total_mse
 
 def calculate_spectrum(audio, sr):
     """
@@ -55,60 +51,6 @@ def calculate_low_frequency_ratio(signal, sample_rate=16000, cutoff=500):
     ratio = np.sum(power[low_mask])/np.sum(power)
 
     return ratio
-
-"""
-    根据 Parseval 定理，时域信号的平方和等于
-    完整双边 FFT 幅度平方和除以原始信号长度 N:
-
-        sum(|e[n]|^2) = (1/N) * sum(|E[k]|^2)
-
-    这里已经将 rfft 的单边频谱修正为双边总能量，
-    因此只需除以 len(error)，就能得到对应的时域误差能量。
-
-    注意：这里除以的是原始信号长度，而不是 rfft 的频点数量。
-    结果是误差能量，不是均方误差(MSE)。
-"""
-def calculate_band_and_total_mse(
-    predicted,
-    clean,
-    sample_rate=16000,
-    low_freq=1000,
-    high_freq=3000,
-):
-    # 计算重建误差
-    error = predicted - clean
-
-    # 计算单边 FFT
-    spectrum = np.fft.rfft(error)
-
-    # 获取各 FFT 频点对应的频率
-    freqs = np.fft.rfftfreq(len(error),1/sample_rate)
-
-    # 计算功率谱
-    power = np.abs(spectrum)**2
-
-    # 将单边功率谱修正为完整频谱对应的能量
-    if len(error) % 2 == 0:
-        power[1:-1] *= 2
-    else:
-        power[1:] *= 2
-
-    # 选取目标频段
-    # 左闭右开，最后一个频段包含 Nyquist 频率
-    if high_freq == sample_rate / 2:
-        band_mask = (freqs >= low_freq) & (freqs <= high_freq)
-    else:
-        band_mask = (freqs >= low_freq) & (freqs < high_freq)
-
-    # 计算目标频段误差能量
-    band_energy = np.sum(power[band_mask])/len(error)
-
-    # 转换为每个采样点的均方误差
-    band_mse = band_energy/len(error)
-
-    #计算整体均方误差
-    total_mse = np.mean(error ** 2)
-    return band_mse ,total_mse
 
 def main():
     #calculate_spectrum 测试

@@ -2,7 +2,8 @@
 from pathlib import Path
 
 import numpy as np
-import soundfile as sf
+
+from audio_utils import calculate_snr
 
 """
 名称:混淆函数
@@ -39,6 +40,8 @@ def add_noise(clean, noise, snr_db):
 
     return mixture, scaled_noise
 if __name__ == "__main__":
+    import soundfile as sf
+
     # 1. 定位数据集
     BASE_DIR = Path(__file__).resolve().parent
 
@@ -78,10 +81,7 @@ if __name__ == "__main__":
     )
 
     # 6. 验证实际SNR
-    actual_snr_db = 10 * np.log10(
-        np.mean(clean ** 2) /
-        np.mean(scaled_noise ** 2)
-    )
+    actual_snr_db = calculate_snr(clean, clean + scaled_noise)
 
     print(f"目标SNR: {target_snr_db:.2f} dB")
     print(f"实际SNR: {actual_snr_db:.2f} dB")
@@ -109,4 +109,3 @@ if __name__ == "__main__":
     )
 
     print("保存完成:", output_dir)
-

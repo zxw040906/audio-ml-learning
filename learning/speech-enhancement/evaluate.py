@@ -9,21 +9,7 @@ from model import SimpleDenoisingCNN
 from model import DilatedDenoisingCNN
 from model import ResidualDenoisingCNN
 from train import split_by_speaker
-
-
-def calculate_snr(clean, signal):
-    """计算信号相对于干净语音的SNR。"""
-    clean = np.asarray(clean, dtype=np.float64)
-    signal = np.asarray(signal, dtype=np.float64)
-
-    error = signal - clean
-
-    signal_power = np.sum(clean ** 2)
-    error_power = np.sum(error ** 2)
-
-    return 10 * np.log10(
-        signal_power / max(error_power, 1e-12)
-    )
+from audio_utils import calculate_snr
 
 
 def main():

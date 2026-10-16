@@ -7,7 +7,11 @@ import torch
 from dataset import SpeechEnhancementDataset
 from model import ResidualDenoisingCNN
 from train import split_by_speaker
-from analyze_spectrum import calculate_band_and_total_mse
+from audio_utils import (
+    calculate_mse,
+    calculate_band_and_total_mse,
+    calculate_band_correlation_from_energies,
+)
 
 
 def main():
@@ -73,8 +77,12 @@ def main():
         true_noise_energy_values = []
         predicted_noise_energy_values = []
 
-        # 保存每条语音在 1000–3000 Hz 的噪声相关系数
-        correlation_values = []
+        # 两类相关性分别按样本保存，再分别求有效值的平均。
+        noise_correlation_values = []
+
+        # 保存预测噪声与干净语音的频带相关系数
+        speech_noise_correlation_values = []
+
         for index in range(len(dataset)):
 
             # 获取带噪语音和干净语音
@@ -96,13 +104,8 @@ def main():
             predicted_noise = mixture_np - predicted_np
 
             # 计算整体 MSE
-            input_total_mse = np.mean(
-                (mixture_np - clean_np) ** 2
-            )
-
-            output_total_mse = np.mean(
-                (predicted_np - clean_np) ** 2
-            )
+            input_total_mse = calculate_mse(mixture_np, clean_np)
+            output_total_mse = calculate_mse(predicted_np, clean_np)
 
             input_total_mse_values.append(input_total_mse)
             output_total_mse_values.append(output_total_mse)
@@ -111,17 +114,19 @@ def main():
             zeros = np.zeros_like(clean_np)
 
             # 真实噪声在 1000–3000 Hz 的能量
-            true_noise_band_mse,_= calculate_band_and_total_mse(
+            true_noise_band_mse, _ = calculate_band_and_total_mse(
                 predicted=true_noise,
                 clean=zeros,
+                sample_rate=sample_rate,
                 low_freq=1000,
                 high_freq=3000,
             )
 
             # 模型估计噪声在 1000–3000 Hz 的能量
-            predicted_noise_band_mse,_= calculate_band_and_total_mse(
+            predicted_noise_band_mse, _ = calculate_band_and_total_mse(
                 predicted=predicted_noise,
                 clean=zeros,
+                sample_rate=sample_rate,
                 low_freq=1000,
                 high_freq=3000,
             )
@@ -137,26 +142,42 @@ def main():
                 high_freq=3000,
             )
 
-            # 根据 E_error = E_true + E_predicted - 2C 计算交叉能量
-            cross_energy = (
-                true_noise_band_mse
-                + predicted_noise_band_mse
-                - output_error_band_mse
-            ) / 2
-
-            # 计算相关系数的分母
-            denominator = np.sqrt(
-                true_noise_band_mse * predicted_noise_band_mse
+            # 计算干净语音在 1000–3000 Hz 的频带能量
+            speech_band_energy, _ = calculate_band_and_total_mse(
+                predicted=clean_np,
+                clean=zeros,
+                sample_rate=sample_rate,
+                low_freq=1000,
+                high_freq=3000,
             )
 
-            # 计算当前语音的频带相关系数
-            if denominator > 0:
-                correlation = cross_energy / denominator
-            else:
-                correlation = np.nan
+            # 计算预测噪声与干净语音之差的频带能量
+            difference_band_energy, _ = calculate_band_and_total_mse(
+                predicted=predicted_noise,
+                clean=clean_np,
+                sample_rate=sample_rate,
+                low_freq=1000,
+                high_freq=3000,
+            )
 
-            # 保存当前语音的相关系数
-            correlation_values.append(correlation)
+            # 真实噪声 n=x-s，预测噪声 n_hat=x-s_hat；重建误差为 n-n_hat。
+            noise_correlation = calculate_band_correlation_from_energies(
+                true_noise_band_mse,
+                predicted_noise_band_mse,
+                output_error_band_mse,
+            )
+            noise_correlation_values.append(noise_correlation)
+
+            # 另一项比较 n_hat 与干净语音 s，差值能量来自 n_hat-s。
+            speech_noise_correlation = calculate_band_correlation_from_energies(
+                predicted_noise_band_mse,
+                speech_band_energy,
+                difference_band_energy,
+            )
+
+            speech_noise_correlation_values.append(
+                speech_noise_correlation
+            )
 
             # 计算当前语音在四个频段的输入和输出 MSE
             for low_freq, high_freq in bands:
@@ -264,23 +285,48 @@ def main():
         mean_predicted_energy = np.mean(predicted_noise_energy_values)
 
         print(f"\n噪声类型: {noise_type}")
-        print("频段: 1000–3000 Hz")
+        print("频段: 1000~3000 Hz")
         print(f"真实噪声平均频带能量: {mean_true_energy:.6f}")
         print(f"预测噪声平均频带能量: {mean_predicted_energy:.6f}")
         print(f"预测/真实能量比: {mean_predicted_energy / mean_true_energy:.2f}")
-        # 计算10条语音的平均相关系数
-        valid_correlations = np.asarray(correlation_values)
-        valid_correlations = valid_correlations[
-            np.isfinite(valid_correlations)
+        # 分别对每条语音的有效系数求平均。
+        valid_noise_correlations = np.asarray(noise_correlation_values)
+        valid_noise_correlations = valid_noise_correlations[
+            np.isfinite(valid_noise_correlations)
         ]
 
-        if len(valid_correlations) > 0:
-            mean_correlation = np.mean(valid_correlations)
-
-            print(f"平均频带相关系数: {mean_correlation:.4f}")
-            print(f"有效样本数量: {len(valid_correlations)}")
+        if len(valid_noise_correlations) > 0:
+            mean_noise_correlation = np.mean(valid_noise_correlations)
+            print(
+                "真实噪声与预测噪声平均相关系数: "
+                f"{mean_noise_correlation:.4f}"
+            )
+            print(f"有效样本数量: {len(valid_noise_correlations)}")
         else:
             print("没有有效的频带相关系数")
+        # 预测噪声与干净语音的相关性单独统计。
+        valid_speech_correlations = np.asarray(
+            speech_noise_correlation_values
+        )
 
+        valid_speech_correlations = valid_speech_correlations[
+            np.isfinite(valid_speech_correlations)
+        ]
+
+        if len(valid_speech_correlations) > 0:
+            mean_speech_correlation = np.mean(
+                valid_speech_correlations
+            )
+
+            print("\n预测噪声与干净语音的相关性")
+            print("频段: 1000–3000 Hz")
+            print(
+                "预测噪声与干净语音平均相关系数: "
+                f"{mean_speech_correlation:.4f}"
+            )
+            print(f"有效样本数量: {len(valid_speech_correlations)}")
+        else:
+            print("没有有效的语音相关系数")
+            
 if __name__ == "__main__":
     main()

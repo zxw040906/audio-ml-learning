@@ -12,7 +12,10 @@
 | `train.py` | 按说话人划分训练/验证集，用 MSE 和 Adam 训练残差 CNN |
 | `evaluate.py` | 加载残差模型，计算单条验证样本 SNR 并保存试听音频 |
 | `evaluate_batch.py` | 汇总多条样本的 SNR 改善；需要三种模型权重均已生成 |
+| `evaluate_test.py` | 在 `test-clean` 上按说话人抽样，比较固定模型在两种噪声下的指标 |
 | `evaluate_noise_type.py` | 用同一残差模型和固定验证文件比较白噪声、低通噪声 |
+| `evaluate_frequency_error.py` | 比较两种噪声条件下的四频段误差、噪声能量及频带相关性 |
+| `audio_utils.py` | 统一导出 SNR、整体/频带 MSE、频带能量、归一化内积和按说话人抽样工具 |
 | `analyze_spectrum.py` | 比较 `output/` 中预先生成的评估音频频谱；当前输入命名与 `evaluate.py` 输出不一致 |
 
 张量输入输出形状为 `[B,T]`，模型内部扩展为 `[B,1,T]` 以适配 `Conv1d`，最终回到 `[B,T]`。默认采样率为 16 kHz、裁剪/补零长度为 2 秒（32000 点）、混合信噪比为 5 dB。`train.py` 先按说话人划分，再分别截取最多 40 条训练语音和 10 条验证语音；batch size 为 4，训练 5 个 epoch，使用 CPU、`MSELoss(reduction='mean')` 和 Adam（学习率 0.001）。训练脚本当前只训练 `ResidualDenoisingCNN`，并按最低验证损失保存权重。上述是教学用小规模设置，不代表充分训练或对真实噪声的泛化结果。
@@ -115,7 +118,7 @@ $$
 
 取正根是因为只调整噪声幅度，不翻转其符号。最终混合波形为 $y=s+\alpha n$。`mix_audio.py::add_noise` 逐项实现上述运算；输入必须是一维、等长且功率为正。手算检查：若 $P_s=1$、$P_n=4$、目标 $S=0$ dB，则 $\alpha=\sqrt{1/4}=0.5$，缩放噪声功率变为 1，信噪比为 0 dB。目标 SNR 越低，分母中的 $10^{S/10}$ 越小，噪声缩放越大。
 
-独立练习函数 `scale_noise_to_snr(clean, noise, snr_db)` 分别用 `np.mean(clean**2)` 和 `np.mean(noise**2)` 求干净语音与原始噪声的均方功率，按目标分贝值求目标噪声功率，再开平方得到幅度缩放系数；其推导与前文“从目标 SNR 推导噪声缩放”相同。目标 5 dB 的手动核验结果为实际 5.00 dB。该函数用于独立练习和核验；正式 Dataset 路径不先调用它再缩放一次，而是对白噪声或低通噪声只调用 `mix_audio.py::add_noise()` 一次，由该函数负责目标 SNR 缩放和混合。
+兼容练习入口 `noise_type.py::scale_noise_to_snr(clean, noise, snr_db)` 保留原调用方式，但内部委托给 `mix_audio.py::add_noise()` 取得同一套缩放结果；正式 Dataset 路径只调用 `add_noise()` 一次，由它负责目标 SNR 缩放和混合。白噪声仍由 Dataset 使用原来的局部随机数生成器生成，低频噪声仍由 `generate_low_frequency_noise()` 生成。
 
 ### MSE 目标与 SNR 指标
 
@@ -133,9 +136,11 @@ $$
 \mathrm{SNR}_{\mathrm{out}}=10\log_{10}\left(\frac{\sum_t s[t]^2}{\sum_t e[t]^2}\right)
 $$
 
-令 $P_s=T^{-1}\sum_ts[t]^2$、$P_e=T^{-1}\sum_te[t]^2$，则分子分母同除以 $T$，比值不变，故也等于 $10\log_{10}(P_s/P_e)$。`evaluate.py::calculate_snr` 对一条波形计算该值；`evaluate_batch.py::calculate_snr` 沿每条样本的时间轴分别计算。两者均用 `1e-12` 防止误差功率为零时除零。
+令 $P_s=T^{-1}\sum_ts[t]^2$、$P_e=T^{-1}\sum_te[t]^2$，则分子分母同除以 $T$，比值不变，故也等于 $10\log_{10}(P_s/P_e)$。单条和批量评估统一调用 `audio_utils.py::calculate_snr()`；输入转为 `float64`，批量输入形状为 `[B,T]` 并沿时间轴逐条计算。误差为零时返回正无穷，静音参考且误差也为零时返回 NaN，静音参考但误差非零时返回负无穷，不用 epsilon 改写指标定义。`calculate_snr_improvement()` 返回输出 SNR 减输入 SNR；逐样本 dB 的算术平均仍与先合并样本功率再计算不同。
 
 MSE 与输出 SNR 的分子分母角色不同：对固定目标能量的同一条样本，降低误差 MSE（或误差平方和）会提高输出 SNR；但跨样本时目标能量不同，单看 MSE 不足以排序 SNR。训练还使用批次/样本均值，而脚本计算每条记录的能量比。SNR 提升定义为输出 SNR 减输入混合 SNR，单位 dB；它是参考波形误差指标，不等价于主观听感、语音可懂度或空间拾音效果。
+
+当同一条语音的误差功率减半时，SNR 变化为 $10\log_{10}(2)\approx3.01$ dB。改善样本数按未四舍五入的逐条 `snr_improvement > 0` 统计；打印为 `-0.00 dB` 的值不能据显示文本判断符号。改善比例是改善样本数除以样本总数，它与平均 SNR 改善量回答不同问题，应一并报告。对多种噪声的统计可用外层遍历噪声类型、内层遍历语音的结构；每种噪声的平均值和改善比例必须在该噪声对应的内层循环结束后计算。
 
 ### Conv1d：计算、形状、参数与感受野
 
@@ -193,11 +198,33 @@ $$
 
 若初始化末层 weight 与 bias 都为零，则任意支路特征经末层线性映射后 $\hat n=0$，于是初始化时 $\hat s=y$，即模型从恒等映射开始。训练仍通过 `MSELoss(\hat s,s)` 的误差更新网络；对减法关系，$\partial\hat s/\partial\hat n=-1$，故梯度会沿预测噪声支路反传。零初始化只保证最终层输出初始为零，不表示中间层权重为零，也不保证训练后必然去噪成功。实现位于 `ResidualDenoisingCNN.__init__` 与 `forward`。
 
-### 划分、训练、验证与模型选择
+### 划分训练集、验证集与独立测试集
+
+训练集用于更新模型参数，验证集用于选择模型和调整超参数，测试集用于模型固定后的独立性能评估。验证集即使不参与反向传播，只要参与了模型选择，就不能当作完全独立的最终测试。
 
 `train.py::split_by_speaker` 从 `speaker/chapter/*.flac` 路径取说话人 ID，固定 NumPy 种子 42 打乱说话人，约 20% 说话人放入验证集且至少 1 个；余者用于训练。按说话人隔离可减少同一说话人音色同时进入训练与验证造成的泄漏。随后两个 Dataset 各自按排序后的路径最多取 40/10 条；这不是完整数据集训练。白噪声则由样本 index 决定种子。
 
-每个 epoch 训练集 loader 打乱，验证集不打乱。训练步骤是 forward → batch mean MSE → `zero_grad()` → `backward()` → Adam `step()`；验证用 `model.eval()` 和 `no_grad()`，不更新权重。脚本在 5 个 epoch 中保存验证 MSE 最低时的 `state_dict` 到 `output/best_residual_model.pth`。验证集因被用于挑选 epoch/权重，不能再当独立测试集；最终泛化结论需要另留测试说话人/数据。当前没有独立测试集，也没有在训练入口比较三种架构。
+每个 epoch 训练集 loader 打乱，验证集不打乱。训练步骤是 forward → batch mean MSE → `zero_grad()` → `backward()` → Adam `step()`；验证用 `model.eval()` 和 `no_grad()`，不更新权重。脚本在 5 个 epoch 中保存验证 MSE 最低时的 `state_dict` 到 `output/best_residual_model.pth`。验证集参与了权重选择，因此本次另用 LibriSpeech `test-clean` 做固定模型后的独立测试；独立划分不代表小样本结果可以代表整个测试集。训练入口仍只训练残差模型，没有在入口中比较三种架构。
+
+### 使用 `Path` 搜索文件并按说话人抽样
+
+`Path(__file__).resolve().parent` 取得当前脚本所在目录；`Path.rglob("*.flac")` 递归搜索所有子目录，适合 LibriSpeech 的说话人/章节层级。`glob("*.flac")` 匹配当前目录中的文件；模式包含 `**` 时也可以递归，`rglob("*.flac")` 是递归搜索的简写。`Path.relative_to(test_dir)` 可取得相对于测试集根目录的路径，例如从 `test-clean/1089/134686/file.flac` 读取说话人 ID `1089`。
+
+`audio_utils.py::sample_files_by_speaker(test_files, test_dir, num_speakers=10, seed=42)` 使用 `defaultdict(list)` 按说话人分组，`set()` 可用于检查抽样结果中的说话人数量。函数将说话人 ID 排序后交给独立的 `random.Random(seed)` 随机数生成器：`rng.sample()` 不放回抽取不同说话人，再对每位说话人的文件列表调用 `rng.choice()` 选一条。它不消耗 NumPy 噪声生成器的随机状态；当可用说话人少于目标数时，函数使用全部可用说话人。当前实现实际使用的是 `choice()`，不是 `choices()`。
+
+本次调试中曾写成：
+
+```python
+selected_file = rng.choices(files)
+```
+
+`choices()` 的返回值始终是列表，即使只抽一项也是列表。随后对该对象调用 `path.relative_to(test_dir)` 会得到 `AttributeError: 'list' object has no attribute 'relative_to'`。需要单个 `Path` 时应使用：
+
+```python
+selected_file = rng.choice(files)
+```
+
+另外两处容易覆盖或忽略分层抽样结果：抽样后重新赋值 `selected_files = test_files[:10]` 会覆盖选中结果；构造 `SpeechEnhancementDataset` 时传入 `files=test_files` 也会绕过抽样。应始终将 `selected_files` 传给 Dataset。`evaluate_test.py` 在噪声类型循环外生成一次这份列表，然后在 `white` 与 `low_frequency` 两种条件下复用，确保比较使用相同的干净语音。
 
 ### Dataset 噪声类型与数据流
 
@@ -237,6 +264,28 @@ $$
 
 白噪声结果复现了此前记录的 +3.13 dB；两种条件的平均 $\Delta\mathrm{SNR}$ 相差 3.96 dB。**实际观察**是该残差 CNN 在当前低通噪声实验中的 SNR 表现明显差于白噪声。可能解释仍待验证：训练所用白噪声与评估时低通噪声的频谱分布不同；低通噪声也可能与语音本身的低频成分重叠、增加降噪难度。本实验不能证明或区分这两种机制。实验只涉及合成噪声和 10 条验证语音，且这些语音来自用于训练期间模型选择的验证集，不能视为独立测试集，也不能据此推广到真实汽车发动机噪声。
 
+### LibriSpeech 独立测试集与说话人抽样
+
+本节记录固定残差模型在 LibriSpeech `test-clean` 上的两次小样本测试。与 `dev-clean` 的训练/验证划分不同，`test-clean` 不调用 `split_by_speaker()`，用于模型权重固定后的独立评估。用户提供的测试集清单包含 2620 条 FLAC、40 位说话人。两次实验均使用 `ResidualDenoisingCNN`、`output/best_residual_model.pth`、16 kHz、每条 2 秒、输入 SNR 5 dB，并比较 `white` 和 `low_frequency` 合成噪声。以下数值根据本次提供的实验记录整理；实验运行日期和环境未提供，本次文档整理没有重新运行模型。
+
+**实验 A：按排序取前 10 条。** 这 10 条全部来自说话人 `1089`，所以它只能反映单一说话人的小样本表现。
+
+| 噪声类型 | 平均输入 SNR | 平均输出 SNR | 平均 SNR 改善 | 平均输入 MSE | 平均输出 MSE | 改善样本 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 白噪声 | — | — | +5.58 dB | — | — | 10/10 |
+| 低频噪声 | 5.00 dB | 5.11 dB | +0.11 dB | 0.001160 | 0.001130 | 7/10（70%） |
+
+白噪声行只记录了本次提供的平均改善和改善数量；未提供的输入/输出均值不补猜。单一说话人抽样不能充分评价跨说话人泛化。
+
+**实验 B：按说话人固定抽样。** 从 40 位说话人中用 `seed=42` 不放回选择 10 位不同说话人，再从每位说话人的文件中抽取一条。抽样只执行一次，两种噪声条件复用同一批语音。
+
+| 噪声类型 | 平均输入 SNR | 平均输出 SNR | 平均 SNR 改善 | 平均输入 MSE | 平均输出 MSE | 改善样本 | 改善比例 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 白噪声 | 5.00 dB | 9.01 dB | +4.01 dB | 0.001172 | 0.000469 | 8/10 | 80% |
+| 低频噪声 | 5.00 dB | 4.45 dB | −0.55 dB | 0.001172 | 0.001289 | 4/10 | 40% |
+
+**观察与限制：** 这次抽样下，固定模型对白噪声的平均 SNR 有明显提升；对低频噪声，平均 SNR 下降 0.55 dB，表现较弱。按文件排序取前 10 条会造成说话人集中；按说话人抽样改善了说话人覆盖，但 10 位说话人、每人一条仍是小样本。相同语音在不同噪声条件下复用，有助于减少语音样本差异对比较的影响。结果只适用于这批测试语音、固定权重和合成噪声，不能据此推断真实汽车发动机噪声或车厢环境的表现。后续可增加说话人数和每位说话人的样本数，再学习双麦克风 TDOA、GCC-PHAT 与波束形成。
+
 ### Parseval 定理与频带 MSE
 
 对长度为 $N$ 的实值误差序列 $e[n]$ 及其未归一化 DFT $E[k]$，Parseval 定理给出
@@ -253,7 +302,7 @@ E_{\mathrm{band}}=\frac{1}{N}\sum_{k\in\mathrm{band}}P[k],
 MSE_{\mathrm{band}}=\frac{E_{\mathrm{band}}}{N}.
 $$
 
-因此代码中的 `band_energy` 实际是该频带误差的 Parseval 能量（平方和），而函数返回的 `band_mse` 才是按时域长度归一化的频带 MSE。`calculate_band_and_total_mse(predicted, clean, sample_rate, low_freq, high_freq)` 先对 `predicted-clean` 做 FFT，再返回指定频段 MSE 和 `np.mean(error ** 2)` 得到的整体 MSE。频段使用左闭右开区间 `[low_freq, high_freq)`；当上限等于 Nyquist 频率 `sample_rate / 2` 时，最后一个频段改为闭区间以包含 Nyquist 点。相邻频段因此不会重复计入边界点。
+因此代码中的 `band_energy` 实际是该频带误差的 Parseval 能量（平方和），而函数返回的 `band_mse` 才是按时域长度归一化的频带 MSE。`audio_utils.py::calculate_band_and_total_mse(predicted, clean, sample_rate, low_freq, high_freq)` 先对 `predicted-clean` 做 FFT，再返回指定频段 MSE 和 `np.mean(error ** 2)` 得到的整体 MSE。频段使用左闭右开区间 `[low_freq, high_freq)`；当上限等于 Nyquist 频率 `sample_rate / 2` 时，最后一个频段改为闭区间以包含 Nyquist 点。相邻频段因此不会重复计入边界点。
 
 本实验使用 16 kHz 采样率，将 0–8000 Hz 划为 0–500、500–1000、1000–3000、3000–8000 Hz 四段。对长度 16,000 的随机误差核对，四个频段 MSE 之和为 `0.01008350`，整体 MSE 为 `0.01008350`，`np.allclose` 检查为 `True`。这是频带划分与归一化的一致性检查，不是模型效果实验。
 
@@ -293,23 +342,54 @@ $$
 
 ### 真实噪声、预测噪声与频带相关性
 
+`audio_utils.py` 是通用计算和当前复用抽样逻辑的入口，提供参考波形 SNR、SNR 提升、整体 MSE、频带 MSE、频带能量、频带归一化内积及 `sample_files_by_speaker()`。频带 MSE 的 FFT 实现也位于该模块，实验脚本不再各自维护单边补偿、Parseval 归一化和边界规则。`calculate_band_energy()` 返回选定频段的均方能量；`calculate_band_correlation()` 可直接比较两个等形状的一维信号；调用方已有各信号及差值能量时，可用 `calculate_band_correlation_from_energies()` 避免重复 FFT。`evaluate_test.py` 负责测试文件、模型推理、逐条指标及统计输出；模型结构、训练和其他实验配置仍留在各自代码文件。噪声生成与混合保留在 `noise_type.py`、`mix_audio.py`。
+
+```python
+from audio_utils import (
+    calculate_snr,
+    calculate_snr_improvement,
+    calculate_mse,
+    calculate_band_and_total_mse,
+    calculate_band_energy,
+    calculate_band_correlation,
+    calculate_band_correlation_from_energies,
+)
+
+snr_db = calculate_snr(clean, estimate)
+band_mse, total_mse = calculate_band_and_total_mse(
+    predicted=estimate,
+    clean=clean,
+    sample_rate=16000,
+    low_freq=1000,
+    high_freq=3000,
+)
+```
+
+集中维护这些相同定义的计算，可以避免某个评估脚本使用不同的零值保护、FFT 端点补偿或频带边界，而让实验间的指标失去可比性。频带归一化内积不去均值，不是 Pearson 相关系数；对每条样本先算再平均，也不等于先平均能量再算相关性。
+
 残差模型的输出关系是 $\hat{s}=x-\hat{n}$，其中 $x$ 是混合语音，$\hat{s}$ 是模型输出干净语音估计，$\hat{n}=x-\hat{s}$ 是模型隐含的预测噪声。由 $x=s+n$，真实加入噪声为 $n=x-s$；输出重建误差为
 
 $$
-e=\hat{s}-s=(x-\hat{n})-s=n-\hat{n}.
+e = \hat{s} - s = n - \hat{n}
 $$
 
 将同一频带内信号的平方范数记为能量，有
 
 $$
-E_e=E_n+E_{\hat{n}}-2C,
-\qquad
-C=\frac{E_n+E_{\hat{n}}-E_e}{2},
-\qquad
-\rho=\frac{C}{\sqrt{E_nE_{\hat{n}}}}.
+E_e = E_n + E_{\hat{n}} - 2C
 $$
 
-其中 $C$ 是该频带的交叉能量，$\rho$ 是真实噪声与预测噪声的频带相关系数。脚本通过 `calculate_band_and_total_mse()` 取得对零信号的频带 MSE；它和对应频带能量只差相同的长度归一化因子，因此代入上式计算 $C$、$\rho$ 时该公共因子相消。代码按每条语音分别求相关系数，再仅对有限值（分母非零）取算术平均，避免把单条样本值误称为样本平均。
+其中 $C$ 是该频带的交叉能量，$\rho$ 是频带归一化内积。若以 $E_a$、$E_b$、$E_{a-b}$ 表示同一频带、同一归一化方式下的能量，则
+
+$$
+C = \frac{E_a + E_b - E_{a-b}}{2}
+$$
+
+$$
+\rho = \frac{C}{\sqrt{E_a E_b}}
+$$
+
+这是未去均值的频带内积归一化，不是 Pearson 相关系数；它也不能解释为语音能量被删除的百分比。`evaluate_frequency_error.py` 分别计算两种关系：真实噪声 $n=x-s$ 与预测噪声 $\hat{n}=x-\hat{s}$ 的相关性，差值信号为 $n-\hat{n}=\hat{s}-s$；以及预测噪声 $\hat{n}$ 与干净语音 $s$ 的相关性，差值信号为 $\hat{n}-s$。脚本从已算出的对应频带能量和差值能量取得每条语音的系数，再分别对有限值取算术平均。
 
 1000–3000 Hz 的历史记录如下；噪声能量列是 10 条语音逐条频带能量的平均，能量比是两列均值之比，相关系数则是逐样本相关系数的平均：
 
@@ -318,18 +398,21 @@ $$
 | 真实噪声平均频带能量 | 0.000614 | 0.000140 |
 | 预测噪声平均频带能量 | 0.000946 | 0.000600 |
 | 预测/真实能量比 | 1.54 | 4.29 |
-| 平均频带相关系数 | 0.6624 | 0.3494 |
+| 真实噪声与预测噪声平均相关系数 | 0.6624 | 0.3494 |
+| 预测噪声与干净语音平均相关系数 | 0.6647 | 0.8671 |
 | 有效样本数 | 10 | 10 |
 
-白噪声条件下预测噪声与真实噪声的频带相关性较高；低频噪声条件下预测噪声能量相对真实噪声明显偏大，相关性也较低。这些结果支持“低频噪声条件下存在中频噪声估计失配”的假设，但预测/真实能量比不等于噪声估计误差比；预测噪声能量偏大本身不能证明模型误删了具体语音成分。该判断还需分析预测噪声与干净语音在 1000–3000 Hz 的关系。
+上述两类相关性都描述 1000–3000 Hz 内信号的归一化内积，不代表模型删除了相同比例的语音能量。结果来自 10 条验证语音及固定权重，只是该实验条件下的观察；验证集参与模型选择，不能据此推断独立测试集、主观音质或真实噪声表现。
+
+白噪声条件下预测噪声与真实噪声的频带相关性较高；低频噪声条件下预测噪声能量相对真实噪声明显偏大，二者相关性也较低。预测噪声与干净语音的相关性在低频噪声条件下更高，说明这两种信号在该频带内有较强的归一化内积，但不能单凭该系数断定模型误删了多少语音。预测/真实能量比也不等于噪声估计误差比；这些观察不足以证明具体失真机制。
 
 ### 频带实验的适用范围与后续方向
 
-这些结果来自参与模型选择的验证集，不是独立测试集；`low_frequency` 是由一阶递推生成的合成低通噪声，不代表真实车内发动机噪声。结论只适用于本次固定模型权重、10 条语音、2 秒片段、16 kHz 采样率及 5 dB 输入 SNR 等实验条件。后续可分析预测噪声与干净语音在 1000–3000 Hz 的关系，比较不同噪声类型或混合噪声训练效果，并使用独立测试集和真实车内噪声验证。
+这些结果来自参与模型选择的验证集，不是独立测试集；`low_frequency` 是由一阶递推生成的合成低通噪声，不代表真实车内发动机噪声。结论只适用于本次固定模型权重、10 条语音、2 秒片段、16 kHz 采样率及 5 dB 输入 SNR 等实验条件。后续可进一步分析语音失真的来源，比较不同噪声类型或混合噪声训练效果，并使用独立测试集和真实车内噪声验证。
 
 ### 实验结论与局限
 
-本练习把可控加性噪声、时域监督目标、卷积感受野和参考波形 SNR 串成了可解释流程。历史记录中残差 CNN 的 10 条验证样本均有正提升，但验证集参与模型选择，样本数少，不能据此声称稳定泛化或主观质量提升。当前 `train.py` 只训练残差模型；三模型比较所需另两份权重尚无当前训练入口生成。`analyze_spectrum.py` 与 `evaluate.py` 的 WAV 命名不匹配。该单通道系统也没有阵列几何、通道同步或目标区域标签，因此只为后续区域拾音建立信号处理和学习基础。
+本练习把可控加性噪声、时域监督目标、卷积感受野和参考波形 SNR 串成了可解释流程。历史验证结果和本节新增的独立测试小样本都受样本量、噪声类型和固定权重限制，不能据此声称稳定泛化或主观质量提升。`train.py` 仍只训练残差模型；三模型比较所需另两份权重尚无当前训练入口生成。`analyze_spectrum.py` 与 `evaluate.py` 的 WAV 命名不匹配。该单通道系统也没有阵列几何、通道同步或目标区域标签，因此只为后续区域拾音建立信号处理和学习基础。
 
 ## 本地文件与版本控制
 
