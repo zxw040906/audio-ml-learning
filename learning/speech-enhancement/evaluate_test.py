@@ -17,17 +17,23 @@ def main():
 
     # 查找独立测试集中的所有音频
     test_files = sorted(test_dir.rglob("*.flac"))
+    #评估说话人数量
+    speakers = 40
+    #随机种子
+    seed = 42
     #此处使用分层抽样确保测试评估客观可信
     selected_files = sample_files_by_speaker(
     test_files=test_files,
     test_dir=test_dir,
-    num_speakers=10,
-    seed=42,
+    num_speakers=speakers,
+    seed=seed,
     )
     print("抽样后音频数量:", len(selected_files))
+    """
     print("抽样文件:")
     for path in selected_files:
         print(path.relative_to(test_dir))
+    """
 
     # 加载已经训练好的残差 CNN
     model = ResidualDenoisingCNN()
@@ -113,13 +119,35 @@ def main():
         mean_input_snr = np.mean(input_snr_values)
         mean_output_snr = np.mean(output_snr_values)
 
-        # 练习 1：计算平均 SNR 改善量
+        # 计算平均 SNR 改善量
         mean_improvement = np.mean(snr_improvements)
+        # 计算SNR标准差
+
+        # 转换为 NumPy 数组，便于统计分析
+        improvements = np.asarray(snr_improvements)
+
+        # 平均改善量
+        mean_improvement = np.mean(improvements)
+
+        # 计算样本标准差
+        std_improvement = np.std(
+            improvements,
+            ddof=1
+        )
+
+        # 最好和最差样本
+        max_improvement = np.max(improvements)
+        min_improvement = np.min(improvements)
+
+        print(f"平均 SNR 改善: {mean_improvement:+.2f} dB")
+        print(f"SNR 改善标准差: {std_improvement:.2f} dB")
+        print(f"最大 SNR 改善: {max_improvement:+.2f} dB")
+        print(f"最小 SNR 改善: {min_improvement:+.2f} dB")
 
         mean_input_mse = np.mean(input_mse_values)
         mean_output_mse = np.mean(output_mse_values)
 
-        # 练习 2：统计 SNR 改善量大于 0 的样本数量
+        # 统计 SNR 改善量大于 0 的样本数量
         improved_count = np.sum(
             np.asarray(snr_improvements) > 0
         )
@@ -135,7 +163,7 @@ def main():
         print(f"平均输入 MSE: {mean_input_mse:.6f}")
         print(f"平均输出 MSE: {mean_output_mse:.6f}")
         print(f"改善样本数量: {improved_count}/{len(dataset)}")
-        print(f"改善样本比例: {improved_ratio:.1%}")
+        print(f"改善样本比例: {improved_ratio:.1%}\n")
 
 
 if __name__ == "__main__":
