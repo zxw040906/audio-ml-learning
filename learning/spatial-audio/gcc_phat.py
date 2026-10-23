@@ -1,79 +1,9 @@
 import numpy as np
-from spatial_utils import simulate_delay
-
-def estimate_normal_delay(mic1, mic2, max_lag):
-    """只计算物理约束范围内的普通互相关,可显著减少计算量"""
-
-    N = len(mic1)
-
-    # 避免搜索超过信号本身长度的延迟
-    max_lag = min(max_lag, N - 1)
-
-    lags = np.arange(-max_lag, max_lag + 1)
-
-    correlation = []
-
-    for k in lags:
-
-        if k > 0:
-            # mic2 比 mic1 晚到 k 个采样点
-            value = np.dot(
-                mic1[:N-k],
-                mic2[k:]
-            )
-
-        elif k < 0:
-            # mic2 比 mic1 早到 -k 个采样点
-            q = -k
-            value = np.dot(
-                mic1[q:],
-                mic2[:N-q]
-            )
-
-        else:
-            # 零延迟时，两路完整信号的点积
-            value = np.dot(mic1, mic2)
-
-        correlation.append(value)
-
-    correlation = np.asarray(correlation)
-
-    # 寻找最大的相关值索引
-    peak_index = np.argmax(correlation)
-
-    return int(lags[peak_index])
-
-def estimate_phat_delay(mic1, mic2, max_lag):
-    """GCC-PHAT：返回带符号的整数采样延迟。"""
-
-    N = len(mic1)
-    n_fft = 2 * N - 1
-
-    X1 = np.fft.fft(mic1, n=n_fft)
-    X2 = np.fft.fft(mic2, n=n_fft)
-
-    cross_spectrum = X2 * np.conj(X1)
-
-    phat = cross_spectrum / np.maximum(
-        np.abs(cross_spectrum), 1e-12
-    )
-
-    gcc = np.fft.ifft(phat).real
-
-    gcc = np.concatenate((
-        gcc[-(N - 1):],
-        gcc[:N],
-    ))
-
-    lags = np.arange(-(N - 1), N)
-    valid_mask = np.abs(lags) <= max_lag
-
-    valid_lags = lags[valid_mask]
-    valid_gcc = gcc[valid_mask]
-
-    peak_index = np.argmax(valid_gcc)
-    return int(valid_lags[peak_index])
-
+from spatial_utils import (
+    simulate_delay,
+    estimate_normal_delay,
+    estimate_phat_delay,
+)
 
 # 实验次数
 num_trials = 100
